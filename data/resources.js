@@ -6,6 +6,7 @@ const resources = [
   {
     week: 1,
     title: "Introduction to the Human-Computer Interaction Course",
+    keywords: ["Human-Centered Design", "Affordances", "Interaction Design", "Model Human Processor", "Discoverability"],
     materials: [
       {
         title: "Introduction to the Course",
@@ -24,6 +25,7 @@ const resources = [
   {
     week: 2,
     title: "Computer",
+    keywords: ["Cognitive Load Theory", "Heuristic Evaluation", "Usability Testing", "Task Analysis", "Prototyping"],
     materials: [
       {
         title: "Computer",
@@ -33,9 +35,9 @@ const resources = [
       },
       {
         title: "Summary of Week 2",
-        type: "docx",
-        viewLink: `${baseUrl}/week2/short-week2.docx`,
-        downloadLink: `${baseUrl}/week2/short-week2.docx`
+        type: "pdf",
+        viewLink: `${baseUrl}/week2/short-week2.pdf`,
+        downloadLink: `${baseUrl}/week2/short-week2.pdf`
       },
       {
         title: "Details of Week 2",
@@ -48,6 +50,7 @@ const resources = [
   {
     week: 3,
     title: "Interaction",
+    keywords: ["Fitts' Law", "GOMS (Goals, Operators, Methods, and Selection)", "KLM (Keystroke-Level Model)", "Ergonomics", "Interaction Constraints"],
     materials: [
       {
         title: "Interaction",
@@ -66,6 +69,7 @@ const resources = [
   {
     week: 4,
     title: "Paradigms",
+    keywords: ["Visual Design", "Gestalt Principles", "Color Theory", "Typography", "Design Aesthetics"],
     materials: [
       {
         title: "Paradigms",
@@ -84,6 +88,7 @@ const resources = [
   {
     week: 5,
     title: "Interaction Design Basis",
+    keywords: ["Accessibility", "WCAG Standards", "Universal Design", "Inclusive Design", "Assistive Technology"],
     materials: [
       {
         title: "Interaction Design Basis",
@@ -102,6 +107,7 @@ const resources = [
   {
     week: 6,
     title: "HCI in Software Process",
+    keywords: ["Mobile UI/UX Design", "Responsive Design", "Touch Interaction", "Multi-modal Interfaces", "Context-Aware Systems"],
     materials: [
       {
         title: "HCI in Software Process",
@@ -120,6 +126,7 @@ const resources = [
   {
     week: 7,
     title: "Design Rules",
+    keywords: ["User Journey Mapping", "Personas", "Scenarios", "Storyboarding", "Design Thinking Process"],
     materials: [
       {
         title: "Design Rules",
@@ -138,6 +145,7 @@ const resources = [
   {
     week: 8,
     title: "Implementation Support",
+    keywords: ["Usability Testing", "User Feedback Analysis", "A/B Testing", "Task-Centered Design", "Iterative Design"],
     materials: [
       {
         title: "Implementation Support",
@@ -156,6 +164,7 @@ const resources = [
   {
     week: 10,
     title: "Universal Design",
+    keywords: ["Ethical HCI", "Privacy by Design", "User Data", "Bias in AI Systems", "Human-AI Interaction"],
     materials: [
       {
         title: "Universal Design",
@@ -174,6 +183,7 @@ const resources = [
   {
     week: 11,
     title: "User Support",
+    keywords: ["Gamification", "User Engagement", "Motivation Theories", "Interaction Feedback Loops", "Game Design Elements"],
     materials: [
       {
         title: "User Support",
@@ -192,6 +202,7 @@ const resources = [
   {
     week: 12,
     title: "Cognitive Models",
+    keywords: ["Future of HCI", "AR/VR Interfaces", "Ubiquitous Computing", "Smart Systems", "Emerging Technologies"],
     materials: [
       {
         title: "Cognitive Models",
@@ -210,6 +221,7 @@ const resources = [
   {
     week: 'misc',
     title: "Additional Resources",
+    keywords: ["User Perception Studies", "Emotional Design", "Adaptive Interfaces", "Contextual Inquiry", "Experimental HCI Methods"],
     materials: [
       {
         title: "Usability Testing of a Three-Dimensional Library Orientation Game",
