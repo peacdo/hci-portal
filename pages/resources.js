@@ -1,3 +1,4 @@
+// pages/resources.js
 import { useState, useMemo, useCallback } from 'react';
 import Layout from '../components/Layout';
 import WeekCard from '../components/resources/WeekCard';
@@ -16,6 +17,7 @@ const ResourcesPage = () => {
         bookmarked: false
     });
     const [showFilters, setShowFilters] = useState(false);
+    const [activeKeyword, setActiveKeyword] = useState(null);
 
     // Extract all unique keywords across all resources
     const allKeywords = useMemo(() => {
@@ -67,16 +69,45 @@ const ResourcesPage = () => {
         }).filter(Boolean);
     }, [searchTerm, filters]);
 
+    const handleKeywordClick = (keyword) => {
+        if (activeKeyword === keyword) {
+            // If clicking the same keyword, clear the filter
+            setActiveKeyword(null);
+            setSearchTerm('');
+        } else {
+            // Set new keyword filter
+            setActiveKeyword(keyword);
+            setSearchTerm(keyword);
+        }
+    };
+
     const handleSearch = useCallback((term) => {
         setSearchTerm(term);
-        if (term) setShowKeywords(true);
+        if (!term) {
+            setActiveKeyword(null);
+        }
     }, []);
+
+    const clearFilters = () => {
+        setFilters({
+            type: 'all',
+            completion: 'all',
+            bookmarked: false
+        });
+        setSearchTerm('');
+        setActiveKeyword(null);
+    };
 
     const resourceStats = useMemo(() => {
         const total = resources.reduce((acc, week) => acc + week.materials.length, 0);
         const filtered = filteredResources.reduce((acc, week) => acc + week.materials.length, 0);
         return { total, filtered };
     }, [filteredResources]);
+
+    const hasActiveFilters =
+        Object.values(filters).some(Boolean) ||
+        searchTerm ||
+        activeKeyword;
 
     return (
         <Layout>
@@ -116,7 +147,11 @@ const ResourcesPage = () => {
                 <div className="space-y-4">
                     <SearchBar
                         onSearch={handleSearch}
-                        placeholder="Search by title, type, or keyword..."
+                        activeKeyword={activeKeyword}
+                        onClearKeyword={() => {
+                            setActiveKeyword(null);
+                            setSearchTerm('');
+                        }}
                     />
 
                     {showFilters && (
@@ -195,8 +230,12 @@ const ResourcesPage = () => {
                                 {allKeywords.map((keyword) => (
                                     <button
                                         key={keyword}
-                                        onClick={() => handleSearch(keyword)}
-                                        className="px-3 py-1 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
+                                        onClick={() => handleKeywordClick(keyword)}
+                                        className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                                            activeKeyword === keyword
+                                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50'
+                                        }`}
                                     >
                                         {keyword}
                                     </button>

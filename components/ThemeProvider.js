@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
-const ThemeContext = createContext({});
+const ThemeContext = createContext({
+    darkMode: false,
+    setDarkMode: () => {}
+});
 
 export function ThemeProvider({ children }) {
     const [darkMode, setDarkMode] = useState(false);

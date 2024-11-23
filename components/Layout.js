@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, Home, Book, FileText, Info, Github, MessageSquare } from 'lucide-react';
+import { Mail, Home, Book, FileText, Info, Github, MessageSquare, GraduationCap } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useTheme } from './ThemeProvider';
@@ -11,6 +11,14 @@ const Layout = ({ children }) => {
   const isActive = (path) => {
     return router.pathname === path ? "text-blue-300" : "text-white";
   };
+
+  const navItems = [
+    { href: "/", icon: Home, label: "Home" },
+    { href: "/resources", icon: FileText, label: "Resources" },
+    { href: "/quizzes", icon: GraduationCap, label: "Quizzes" },
+    { href: "/flashcards", icon: Book, label: "Flashcards" },
+    { href: "/about", icon: Info, label: "About" },
+  ];
 
   return (
       <div className="min-h-screen flex flex-col bg-white dark:bg-gray-900 transition-colors">
@@ -25,29 +33,16 @@ const Layout = ({ children }) => {
               </div>
 
               <div className="flex items-center space-x-8">
-                <Link
-                    href="/"
-                    className={`flex items-center space-x-2 hover:text-blue-300 transition-colors ${isActive('/')}`}
-                >
-                  <Home className="h-5 w-5" />
-                  <span className="font-medium">Home</span>
-                </Link>
-
-                <Link
-                    href="/resources"
-                    className={`flex items-center space-x-2 hover:text-blue-300 transition-colors ${isActive('/resources')}`}
-                >
-                  <FileText className="h-5 w-5" />
-                  <span className="font-medium">Resources</span>
-                </Link>
-
-                <Link
-                    href="/about"
-                    className={`flex items-center space-x-2 hover:text-blue-300 transition-colors ${isActive('/about')}`}
-                >
-                  <Info className="h-5 w-5" />
-                  <span className="font-medium">About</span>
-                </Link>
+                {navItems.map(({ href, icon: Icon, label }) => (
+                    <Link
+                        key={href}
+                        href={href}
+                        className={`flex items-center space-x-2 hover:text-blue-300 transition-colors ${isActive(href)}`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="font-medium">{label}</span>
+                    </Link>
+                ))}
               </div>
             </div>
           </div>

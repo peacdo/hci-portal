@@ -20,6 +20,16 @@ self.__BUILD_MANIFEST = {
       "static/chunks/main.js",
       "static/chunks/pages/_error.js"
     ],
+    "/flashcards": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/flashcards.js"
+    ],
+    "/quizzes": [
+      "static/chunks/webpack.js",
+      "static/chunks/main.js",
+      "static/chunks/pages/quizzes.js"
+    ],
     "/resources": [
       "static/chunks/webpack.js",
       "static/chunks/main.js",

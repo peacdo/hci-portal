@@ -1,16 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, BarChart2 } from 'lucide-react';
 import { useProgress } from '../contexts/ProgressContext';
+import { useRouter } from 'next/router';
+import { useQuiz } from '../contexts/QuizContext';
+import quizData from '../data/quizzes';
 
 const ProgressOverview = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const { getTotalProgress, getWeekProgress } = useProgress();
+    const { getQuizResults } = useQuiz();
+    const router = useRouter();
+
+    const weekProgress = Array.from({ length: 12 }, (_, i) => {
+        const weekId = i + 1;
+        const weekQuizzes = quizData.filter(quiz =>
+            quiz.type === 'week' && quiz.relatedWeek.toString() === weekId.toString()
+        );
+
+        // Count only unique passed quizzes
+        const passedQuizzes = weekQuizzes.filter(quiz => {
+            const results = getQuizResults(quiz.id);
+            return results.some(result => result.passed);
+        }).length;
+
+        const progress = getWeekProgress(weekId);
+
+        return {
+            week: weekId,
+            progress,
+            totalQuizzes: weekQuizzes.length,
+            passedQuizzes
+        };
+    });
+
+    const scrollToWeek = (week) => {
+        router.push(`/resources#week-${week}`).then(() => {
+            const element = document.getElementById(`week-${week}`);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    };
+
+    // Handle scroll when hash changes
+    useEffect(() => {
+        if (router.asPath.includes('#')) {
+            const hash = router.asPath.split('#')[1];
+            const element = document.getElementById(hash);
+            if (element) {
+                setTimeout(() => {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
+        }
+    }, [router.asPath]);
 
     const totalProgress = getTotalProgress();
-    const weekProgress = Array.from({ length: 12 }, (_, i) => ({
-        week: i + 1,
-        progress: getWeekProgress(i + 1)
-    }));
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
@@ -48,24 +93,39 @@ const ProgressOverview = () => {
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {weekProgress.map(({ week, progress }) => (
-                            <div key={week} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                                <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                                    Week {week}
-                                </div>
-                                <div className="flex items-center">
-                                    <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full">
-                                        <div
-                                            className="h-full bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-300"
-                                            style={{ width: `${progress}%` }}
-                                        />
+                        {weekProgress.map(({ week, progress, totalQuizzes, passedQuizzes }) => (
+                            <button
+                                key={week}
+                                onClick={() => scrollToWeek(week)}
+                                className="block w-full text-left bg-gray-50 dark:bg-gray-700 rounded-lg p-4
+                                         hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors cursor-pointer
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        Week {week}
                                     </div>
-                                    <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                                        {Math.round(progress)}%
-                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {passedQuizzes}/{totalQuizzes} Quizzes
+                                        </span>
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                                            {Math.round(progress)}%
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
+                                <div className="h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full">
+                                    <div
+                                        className="h-full bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-300"
+                                        style={{ width: `${progress}%` }}
+                                    />
+                                </div>
+                            </button>
                         ))}
+                    </div>
+
+                    <div className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
+                        Click on a week to navigate to its content
                     </div>
                 </div>
             )}
