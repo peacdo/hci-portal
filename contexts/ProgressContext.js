@@ -1,5 +1,6 @@
 // contexts/ProgressContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import resources from '../data/resources'; // Import the resources data
 
 const ProgressContext = createContext({});
 
@@ -37,19 +38,42 @@ export function ProgressProvider({ children }) {
     };
 
     const getWeekProgress = (weekId) => {
-        const weekMaterials = Object.keys(progress).filter(key => key.startsWith(`${weekId}-`));
-        if (weekMaterials.length === 0) return 0;
+        // Find the week in resources data
+        const weekData = resources.find(week => week.week.toString() === weekId.toString());
+        if (!weekData) return 0;
 
-        const completedMaterials = weekMaterials.filter(key => progress[key]);
-        return (completedMaterials.length / weekMaterials.length) * 100;
+        // Get total number of materials for this week
+        const totalMaterials = weekData.materials.length;
+        if (totalMaterials === 0) return 0;
+
+        // Count completed materials
+        let completedCount = 0;
+        for (let i = 0; i < totalMaterials; i++) {
+            if (getProgress(weekId, i)) {
+                completedCount++;
+            }
+        }
+
+        // Calculate percentage
+        return (completedCount / totalMaterials) * 100;
     };
 
     const getTotalProgress = () => {
-        const totalMaterials = Object.keys(progress).length;
-        if (totalMaterials === 0) return 0;
+        let totalMaterials = 0;
+        let completedMaterials = 0;
 
-        const completedMaterials = Object.values(progress).filter(Boolean).length;
-        return (completedMaterials / totalMaterials) * 100;
+        // Calculate using actual resources data
+        resources.forEach(week => {
+            const weekId = week.week;
+            week.materials.forEach((_, materialId) => {
+                totalMaterials++;
+                if (getProgress(weekId, materialId)) {
+                    completedMaterials++;
+                }
+            });
+        });
+
+        return totalMaterials === 0 ? 0 : (completedMaterials / totalMaterials) * 100;
     };
 
     return (
