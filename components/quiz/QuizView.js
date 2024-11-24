@@ -31,8 +31,9 @@ const QuizView = ({ quizId }) => {
     };
 
     const currentQuestionData = activeQuiz.questions[currentQuestion];
-    const progress = ((currentQuestion + 1) / activeQuiz.questions.length) * 100;
+    const progress = ((Object.keys(answers).length) / activeQuiz.questions.length) * 100;
     const isLastQuestion = currentQuestion === activeQuiz.questions.length - 1;
+    const allQuestionsAnswered = Object.keys(answers).length === activeQuiz.questions.length;
 
     return (
         <div className="max-w-3xl mx-auto p-6">
@@ -108,12 +109,21 @@ const QuizView = ({ quizId }) => {
                     )}
 
                     {isLastQuestion ? (
-                        <button
-                            onClick={handleSubmitQuiz}
-                            className="flex items-center px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                            Submit Quiz
-                        </button>
+                        allQuestionsAnswered ? (
+                            <button
+                                onClick={handleSubmitQuiz}
+                                className="flex items-center px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                            >
+                                Submit Quiz
+                            </button>
+                        ) : (
+                            <button
+                                disabled
+                                className="flex items-center px-6 py-2 bg-gray-400 text-white rounded cursor-not-allowed"
+                            >
+                                Answer All Questions
+                            </button>
+                        )
                     ) : (
                         <button
                             onClick={goToNextQuestion}

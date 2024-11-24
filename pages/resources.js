@@ -5,7 +5,7 @@ import WeekCard from '../components/resources/WeekCard';
 import SearchBar from '../components/resources/SearchBar';
 import ProgressOverview from '../components/ProgressOverview';
 import BookmarkedResources from '../components/resources/BookmarkedResources';
-import { Tag, Search, Filter, SlidersHorizontal } from 'lucide-react';
+import { Tag, Search, Filter, SlidersHorizontal, ChevronDown, ChevronUp } from 'lucide-react';
 import resources from '../data/resources';
 
 const ResourcesPage = () => {
@@ -18,6 +18,7 @@ const ResourcesPage = () => {
     });
     const [showFilters, setShowFilters] = useState(false);
     const [activeKeyword, setActiveKeyword] = useState(null);
+    const [expandedWeeks, setExpandedWeeks] = useState(resources.map(week => week.week));
 
     // Extract all unique keywords across all resources
     const allKeywords = useMemo(() => {
@@ -71,11 +72,9 @@ const ResourcesPage = () => {
 
     const handleKeywordClick = (keyword) => {
         if (activeKeyword === keyword) {
-            // If clicking the same keyword, clear the filter
             setActiveKeyword(null);
             setSearchTerm('');
         } else {
-            // Set new keyword filter
             setActiveKeyword(keyword);
             setSearchTerm(keyword);
         }
@@ -109,6 +108,26 @@ const ResourcesPage = () => {
         searchTerm ||
         activeKeyword;
 
+    const toggleAllWeeks = (expand) => {
+        if (expand) {
+            setExpandedWeeks(resources.map(week => week.week));
+        } else {
+            setExpandedWeeks([]);
+        }
+    };
+
+    const toggleWeek = (weekId) => {
+        setExpandedWeeks(prev => {
+            if (prev.includes(weekId)) {
+                return prev.filter(id => id !== weekId);
+            } else {
+                return [...prev, weekId];
+            }
+        });
+    };
+
+    const allExpanded = expandedWeeks.length === resources.length;
+
     return (
         <Layout>
             <div className="container mx-auto px-4 py-8">
@@ -128,13 +147,31 @@ const ResourcesPage = () => {
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className="mt-4 md:mt-0 flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    >
-                        <SlidersHorizontal className="h-5 w-5 mr-2" />
-                        Filters
-                    </button>
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => toggleAllWeeks(!allExpanded)}
+                            className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            {allExpanded ? (
+                                <>
+                                    <ChevronUp className="h-5 w-5 mr-2" />
+                                    Collapse All
+                                </>
+                            ) : (
+                                <>
+                                    <ChevronDown className="h-5 w-5 mr-2" />
+                                    Expand All
+                                </>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            <SlidersHorizontal className="h-5 w-5 mr-2" />
+                            Filters
+                        </button>
+                    </div>
                 </div>
 
                 {/* Bookmarked Resources Section */}
@@ -249,7 +286,12 @@ const ResourcesPage = () => {
                 {filteredResources.length > 0 ? (
                     <div className="space-y-6 mt-6">
                         {filteredResources.map((weekData) => (
-                            <WeekCard key={weekData.week} weekData={weekData} />
+                            <WeekCard
+                                key={weekData.week}
+                                weekData={weekData}
+                                isExpanded={expandedWeeks.includes(weekData.week)}
+                                onToggleExpand={() => toggleWeek(weekData.week)}
+                            />
                         ))}
                     </div>
                 ) : (

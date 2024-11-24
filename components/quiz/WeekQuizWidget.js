@@ -1,6 +1,6 @@
 // components/quiz/WeekQuizWidget.js
 import { useState } from 'react';
-import { GraduationCap, ChevronDown, ChevronUp, Star, Clock, ArrowRight } from 'lucide-react';
+import { GraduationCap, ChevronDown, ChevronUp, Star, Clock, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
 import { useQuiz } from '../../contexts/QuizContext';
 import Link from 'next/link';
 import quizData from '../../data/quizzes';
@@ -37,6 +37,7 @@ const WeekQuizWidget = ({ weekId }) => {
             .map(stat => stat.quiz.id)
     ).size;
     const progressPercentage = (uniquePassedQuizzes / totalQuizzes) * 100;
+    const allQuizzesPassed = uniquePassedQuizzes === totalQuizzes;
 
     return (
         <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
@@ -50,15 +51,26 @@ const WeekQuizWidget = ({ weekId }) => {
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                             Week {weekId} Quizzes
                         </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {uniquePassedQuizzes} of {totalQuizzes} completed
-                        </p>
+                        <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                            <span className="flex items-center space-x-1">
+                                {allQuizzesPassed ? (
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                ) : (
+                                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                                )}
+                                <span>
+                                    {uniquePassedQuizzes} of {totalQuizzes} completed
+                                </span>
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center space-x-4">
                     <div className="hidden sm:block w-32 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
                         <div
-                            className="h-full bg-blue-600 dark:bg-blue-400 rounded-full transition-all duration-300"
+                            className={`h-full rounded-full transition-all duration-300 ${
+                                allQuizzesPassed ? 'bg-green-500' : 'bg-blue-600 dark:bg-blue-400'
+                            }`}
                             style={{ width: `${progressPercentage}%` }}
                         />
                     </div>
@@ -112,7 +124,8 @@ const WeekQuizWidget = ({ weekId }) => {
                                         </span>
                                     )}
                                     {isPassed && (
-                                        <span className="text-green-600 dark:text-green-400">
+                                        <span className="flex items-center text-green-600 dark:text-green-400">
+                                            <CheckCircle className="h-4 w-4 mr-1" />
                                             Passed
                                         </span>
                                     )}
