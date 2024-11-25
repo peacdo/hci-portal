@@ -22,6 +22,7 @@ export default function About() {
 
                 <div className="flex space-x-4 mb-6">
                   <a
+                      target="_blank"
                       href="https://scholar.google.com.tr/citations?user=q6kaxIsAAAAJ&hl=tr"
                       className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       aria-label="Google Scholar Profile"
@@ -29,6 +30,7 @@ export default function About() {
                     <BookOpen className="h-6 w-6" />
                   </a>
                   <a
+                      target="_blank"
                       href="https://www.linkedin.com/in/ayşe-kula-5a33a16/"
                       className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       aria-label="LinkedIn Profile"
@@ -36,6 +38,7 @@ export default function About() {
                     <Linkedin className="h-6 w-6" />
                   </a>
                   <a
+                      target="_blank"
                       href="mailto:ayse.kula@ostimteknik.edu.tr"
                       className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                       aria-label="Email Contact"
@@ -72,6 +75,7 @@ export default function About() {
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">About the Developer</h2>
               <div className="flex space-x-4">
                 <a
+                    target="_blank"
                     href="https://github.com/peacdo"
                     className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                     aria-label="GitHub Profile"
@@ -79,6 +83,7 @@ export default function About() {
                   <Github className="h-5 w-5" />
                 </a>
                 <a
+                    target="_blank"
                     href="mailto:gorkemozyilmaz@outlook.com"
                     className="text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                     aria-label="Email Contact"

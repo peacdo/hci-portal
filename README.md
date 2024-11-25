@@ -1,28 +1,45 @@
 # HCI Portal
 
-A modern web portal for Human-Computer Interaction course materials and resources, built with Next.js and Tailwind CSS.
+A comprehensive web portal for Human-Computer Interaction course materials and resources, built with Next.js and Tailwind CSS.
 
 ## 📋 Overview
 
-The HCI Portal is a web application designed to provide easy access to course materials, lecturer information, and resources for students studying Human-Computer Interaction. The portal features a clean, responsive interface with intuitive navigation and document viewing capabilities.
+The HCI Portal provides a centralized platform for accessing course materials, quizzes, flashcards, and resources for Human-Computer Interaction studies. Features an intuitive interface with dark mode support and responsive design.
 
 ## ✨ Features
 
-- **Home Page**: Introduction to Human-Computer Interaction with a getting started guide
-- **About Page**: Detailed information about the course lecturer with professional links
-- **Resources Page**: 
-  - Week-by-week course materials
-  - Integrated document viewer for PDFs
-  - Direct download options for course materials
-  - Support for multiple document types (PDF, DOCX)
-  - Responsive modal viewers for documents
+- **Course Resources**
+    - Week-by-week course materials
+    - PDF and DOCX document support
+    - Integrated document viewer
+    - Progress tracking
+    - Bookmarking system
+    - Note-taking capabilities
+    - Resource rating system
+    - Keyword-based search and filtering
+
+- **Interactive Learning**
+    - Flashcard system with custom card creation
+    - Weekly quizzes with detailed feedback
+    - Progress tracking and analytics
+    - Quiz result history
+    - Suggested materials for improvement
+
+- **User Experience**
+    - Dark/Light mode toggle
+    - Responsive design
+    - Bookmark management
+    - Progress overview
+    - Material categorization
+    - Advanced search and filtering
 
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
-- **UI Components**: Custom components with shadcn/ui integration
+- **State Management**: React Context
+- **UI Components**: shadcn/ui
 
 ## 🚀 Getting Started
 
@@ -42,41 +59,60 @@ The HCI Portal is a web application designed to provide easy access to course ma
    npm run dev
    ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## 📁 Project Structure
 
 ```
 hci-portal/
-├── .next/
 ├── components/
-│   ├── Layout.js
-│   └── WebsiteTheme.js
+│   ├── flashcards/
+│   ├── quiz/
+│   ├── resources/
+│   └── ui/
+├── contexts/
+│   ├── FlashcardContext.js
+│   ├── ProgressContext.js
+│   ├── QuizContext.js
+│   └── ResourceManagementContext.js
 ├── data/
+│   ├── defaultFlashcards.js
+│   ├── quizzes.js
 │   └── resources.js
-├── node_modules/
 ├── pages/
 │   ├── _app.js
 │   ├── _document.js
 │   ├── about.js
+│   ├── flashcards.js
 │   ├── index.js
-│   └── resources.js
-├── resources/
-├── styles/
-├── .gitignore
-├── package-lock.json
-├── package.json
-├── postcss.config.js
-└── tailwind.config.js
+│   ├── resources.js
+│   └── quizzes/
+└── styles/
+    └── globals.css
 ```
 
 ## 🔧 Configuration
 
-The course resources can be configured by modifying the `data/resources.js` file. Each resource should include:
-- Title
-- Type (PDF/DOCX)
-- View link (for PDFs)
-- Download link
+### Resource Configuration
+Modify `data/resources.js` to configure course materials:
+- Week information
+- Material titles and types
+- View/download links
+- Keywords for searching
+
+### Quiz Configuration
+Edit `data/quizzes.js` to manage quizzes:
+- Quiz content and answers
+- Passing scores
+- Time limits
+- Question types
+
+### Flashcard Configuration
+Update `data/defaultFlashcards.js` to set up default flashcards:
+- Questions and answers
+- Categories
+- Tags
+- Difficulty levels
 
 ## 🤝 Contributing
 
@@ -84,7 +120,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - see LICENSE file for details
 
 ## 👨‍💻 Developer
 
