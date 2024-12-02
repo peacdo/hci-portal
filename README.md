@@ -1,6 +1,6 @@
 # HCI Portal
 
-A comprehensive web portal for Human-Computer Interaction course materials and resources, built with Next.js and Tailwind CSS.
+A web portal for Human-Computer Interaction course materials and resources, built with Next.js and Tailwind CSS.
 
 ## 📋 Overview
 
