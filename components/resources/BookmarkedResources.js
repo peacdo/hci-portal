@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { useResourceManagement } from '../../contexts/ResourceManagementContext';
+import { useState } from 'react';
 import { Bookmark, ChevronDown, ChevronUp, Eye, Download } from 'lucide-react';
+import { useResourceManagement } from '../../contexts/ResourceManagementContext';
+import { useResources } from '../../contexts/ResourceContext';
 import ResourceViewer from './ResourceViewer';
 
-const BookmarkedResources = ({ resources }) => {
+const BookmarkedResources = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [viewingResource, setViewingResource] = useState(null);
     const { bookmarks, toggleBookmark } = useResourceManagement();
+    const { resources } = useResources();
 
-    // Find all bookmarked resources
     const bookmarkedResources = bookmarks.map(bookmark => {
         const [weekId, materialId] = bookmark.split('-');
         const week = resources.find(w => w.week.toString() === weekId);
@@ -19,6 +20,14 @@ const BookmarkedResources = ({ resources }) => {
     }).filter(Boolean);
 
     if (bookmarkedResources.length === 0) return null;
+
+    const handleDownload = (downloadLink) => {
+        if (!downloadLink) return;
+        // Convert GitHub blob URL to raw URL for direct download
+        const rawUrl = downloadLink.replace('github.com', 'raw.githubusercontent.com')
+            .replace('/blob/', '/');
+        window.open(rawUrl, '_blank');
+    };
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
@@ -58,22 +67,23 @@ const BookmarkedResources = ({ resources }) => {
                             <div className="flex items-center space-x-2">
                                 <button
                                     onClick={() => setViewingResource(resource)}
-                                    className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                    className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                                 >
                                     <Eye className="h-4 w-4 mr-1" />
                                     View
                                 </button>
-                                <a
-                                    href={resource.downloadLink}
-                                    download
-                                    className="flex items-center px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+
+                                <button
+                                    onClick={() => handleDownload(resource.downloadLink)}
+                                    className="flex items-center px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
                                 >
                                     <Download className="h-4 w-4 mr-1" />
                                     Download
-                                </a>
+                                </button>
+
                                 <button
                                     onClick={() => toggleBookmark(resource.weekId, resource.materialId)}
-                                    className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full transition-colors"
+                                    className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-full"
                                     title="Remove bookmark"
                                 >
                                     <Bookmark className="h-5 w-5 fill-current" />

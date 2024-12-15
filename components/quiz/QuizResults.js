@@ -1,26 +1,28 @@
+// components/quiz/QuizResults.js
+import { useEffect } from 'react';
 import { useQuiz } from '../../contexts/QuizContext';
+import { useResources } from '../../contexts/ResourceContext';
 import { Check, X, BookOpen, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import quizData from '../../data/quizzes';
 
 const QuizResults = ({ quizId, timestamp }) => {
     const { getQuizResults } = useQuiz();
-    const allResults = getQuizResults(quizId);
-    const result = allResults.find(r => r.timestamp === timestamp);
-    const quiz = quizData.find(q => q.id === quizId);
+    const { resources } = useResources();
+    const results = getQuizResults(quizId);
+    const result = results.find(r => r.timestamp === timestamp);
 
-    if (!result || !quiz) return null;
+    if (!result) return null;
 
-    const isPerfectScore = Math.round(result.score) === 100;
+    const suggestedMaterials = result.passed ? [] :
+        resources.find(w => w.week.toString() === result.weekId?.toString())?.materials || [];
 
     return (
-        <div className="max-w-3xl mx-auto p-6">
+        <div className="max-w-3xl mx-auto">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                     Quiz Results
                 </h2>
 
-                {/* Score Summary */}
                 <div className={`p-6 rounded-lg mb-8 ${
                     result.passed
                         ? 'bg-green-50 dark:bg-green-900/30'
@@ -34,19 +36,14 @@ const QuizResults = ({ quizId, timestamp }) => {
                         }`}>
                             {Math.round(result.score)}%
                         </p>
-                        <p className={`text-lg ${
-                            result.passed
-                                ? 'text-green-600 dark:text-green-400'
-                                : 'text-red-600 dark:text-red-400'
-                        }`}>
-                            {result.passed ? 'Passed!' : 'Failed'}
+                        <p className={result.passed ? 'text-green-600' : 'text-red-600'}>
+                            {result.passed ? 'Passed!' : 'Not passed'}
                         </p>
                     </div>
                 </div>
 
-                {/* Question Review */}
                 <div className="space-y-6">
-                    {Object.entries(result.questionResults).map(([index, qResult]) => (
+                    {Object.entries(result.questionResults).map(([index, qResult], idx) => (
                         <div key={index} className="border-b border-gray-200 dark:border-gray-700 pb-4">
                             <div className="flex items-start justify-between mb-2">
                                 <h3 className="text-gray-900 dark:text-white font-medium">
@@ -58,21 +55,18 @@ const QuizResults = ({ quizId, timestamp }) => {
                                     <X className="h-5 w-5 text-red-500" />
                                 )}
                             </div>
-                            <p className="text-gray-700 dark:text-gray-300 mb-4">
-                                {quiz.questions[parseInt(index)].question}
-                            </p>
                             <div className="space-y-2">
-                                {quiz.questions[parseInt(index)].options.map((option, optIndex) => (
+                                {qResult.options.map((option, optIndex) => (
                                     <div
                                         key={optIndex}
                                         className={`p-3 rounded ${
                                             optIndex === qResult.userAnswer && optIndex === qResult.correctAnswer
-                                                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                                                ? 'bg-green-100 dark:bg-green-900/30'
                                                 : optIndex === qResult.userAnswer
-                                                    ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                                                    ? 'bg-red-100 dark:bg-red-900/30'
                                                     : optIndex === qResult.correctAnswer
-                                                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                                        ? 'bg-green-100 dark:bg-green-900/30'
+                                                        : 'bg-gray-100 dark:bg-gray-700'
                                         }`}
                                     >
                                         {String.fromCharCode(65 + optIndex)}. {option}
@@ -84,14 +78,13 @@ const QuizResults = ({ quizId, timestamp }) => {
                 </div>
             </div>
 
-            {/* Suggested Materials */}
-            {!result.passed && result.suggestedMaterials && result.suggestedMaterials.length > 0 && (
+            {!result.passed && suggestedMaterials.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                        Suggested Materials for Review
+                        Suggested Study Materials
                     </h3>
                     <div className="space-y-4">
-                        {result.suggestedMaterials.map((material, index) => (
+                        {suggestedMaterials.map((material, index) => (
                             <div key={index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                                 <div className="flex items-center">
                                     <BookOpen className="h-5 w-5 text-blue-500 mr-3" />
@@ -101,6 +94,7 @@ const QuizResults = ({ quizId, timestamp }) => {
                                 </div>
                                 <Link
                                     href={material.viewLink}
+                                    target="_blank"
                                     className="flex items-center text-blue-600 hover:text-blue-700"
                                 >
                                     View
@@ -111,32 +105,6 @@ const QuizResults = ({ quizId, timestamp }) => {
                     </div>
                 </div>
             )}
-
-            {/* Actions */}
-            <div className="flex justify-between">
-                <Link
-                    href="/quizzes"
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
-                >
-                    Back to Quizzes
-                </Link>
-                {!isPerfectScore && (
-                    <Link
-                        href={`/quizzes/${quizId}`}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                    >
-                        Try Again
-                    </Link>
-                )}
-                {isPerfectScore && (
-                    <Link
-                        href={`/quizzes/${quizId}`}
-                        className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                    >
-                        Take Quiz Again
-                    </Link>
-                )}
-            </div>
         </div>
     );
 };

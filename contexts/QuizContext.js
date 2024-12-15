@@ -1,6 +1,6 @@
+// contexts/QuizContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import quizData from '../data/quizzes';
-import resources from '../data/resources';
+import { useResources } from './ResourceContext';
 
 const QuizContext = createContext({});
 
@@ -11,8 +11,8 @@ export function QuizProvider({ children }) {
     const [currentQuestion, setCurrentQuestion] = useState(0);
     const [answers, setAnswers] = useState({});
     const [skippedQuestions, setSkippedQuestions] = useState([]);
+    const { resources } = useResources();
 
-    // Load saved progress and results on mount
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const savedProgress = localStorage.getItem('quizProgress');
@@ -22,7 +22,6 @@ export function QuizProvider({ children }) {
         }
     }, []);
 
-    // Save progress and results when they change
     useEffect(() => {
         if (typeof window !== 'undefined') {
             localStorage.setItem('quizProgress', JSON.stringify(quizProgress));
@@ -31,7 +30,7 @@ export function QuizProvider({ children }) {
     }, [quizProgress, quizResults]);
 
     const startQuiz = (quizId) => {
-        const quiz = quizData.find(q => q.id === quizId);
+        const quiz = quizzes.find(q => q.id === quizId);
         if (quiz) {
             setActiveQuiz(quiz);
             setCurrentQuestion(0);
@@ -47,31 +46,6 @@ export function QuizProvider({ children }) {
         }));
     };
 
-    const skipQuestion = (questionIndex) => {
-        if (!skippedQuestions.includes(questionIndex)) {
-            setSkippedQuestions(prev => [...prev, questionIndex]);
-        }
-        goToNextQuestion();
-    };
-
-    const goToQuestion = (index) => {
-        if (activeQuiz && index >= 0 && index < activeQuiz.questions.length) {
-            setCurrentQuestion(index);
-        }
-    };
-
-    const goToNextQuestion = () => {
-        if (activeQuiz && currentQuestion < activeQuiz.questions.length - 1) {
-            setCurrentQuestion(prev => prev + 1);
-        }
-    };
-
-    const goToPreviousQuestion = () => {
-        if (currentQuestion > 0) {
-            setCurrentQuestion(prev => prev - 1);
-        }
-    };
-
     const calculateResults = () => {
         if (!activeQuiz) return null;
 
@@ -81,29 +55,32 @@ export function QuizProvider({ children }) {
         activeQuiz.questions.forEach((question, index) => {
             const isCorrect = answers[index] === question.correctAnswer;
             if (isCorrect) correctAnswers++;
+
             questionResults[index] = {
                 isCorrect,
                 userAnswer: answers[index],
-                correctAnswer: question.correctAnswer
+                correctAnswer: question.correctAnswer,
+                options: question.options
             };
         });
 
         const score = (correctAnswers / activeQuiz.questions.length) * 100;
         const passed = score >= activeQuiz.passingScore;
 
-        // Get suggested materials if failed
-        const suggestedMaterials = !passed ? getSuggestedMaterials(activeQuiz.relatedWeek) : [];
+        // Get suggested materials for failed quizzes
+        const suggestedMaterials = passed ? [] :
+            resources.find(w => w.week.toString() === activeQuiz.relatedWeek?.toString())?.materials || [];
 
         const results = {
             quizId: activeQuiz.id,
+            weekId: activeQuiz.relatedWeek,
             score,
             passed,
             questionResults,
             timestamp: new Date().toISOString(),
-            suggestedMaterials
+            suggestedMaterials: suggestedMaterials.slice(0, 5)
         };
 
-        // Save results
         setQuizResults(prev => ({
             ...prev,
             [activeQuiz.id]: [...(prev[activeQuiz.id] || []), results]
@@ -112,26 +89,8 @@ export function QuizProvider({ children }) {
         return results;
     };
 
-    const getSuggestedMaterials = (weekId) => {
-        if (!weekId) return [];
-        const week = resources.find(w => w.week.toString() === weekId.toString());
-        return week ? week.materials : [];
-    };
-
-    const getQuizResults = (quizId) => {
-        return quizResults[quizId] || [];
-    };
-
-    const getAllResults = () => {
-        return quizResults;
-    };
-
-    const resetQuiz = () => {
-        setActiveQuiz(null);
-        setCurrentQuestion(0);
-        setAnswers({});
-        setSkippedQuestions([]);
-    };
+    const getQuizResults = (quizId) => quizResults[quizId] || [];
+    const getAllResults = () => quizResults;
 
     return (
         <QuizContext.Provider value={{
@@ -141,14 +100,16 @@ export function QuizProvider({ children }) {
             skippedQuestions,
             startQuiz,
             submitAnswer,
-            skipQuestion,
-            goToQuestion,
-            goToNextQuestion,
-            goToPreviousQuestion,
-            calculateResults,
             getQuizResults,
             getAllResults,
-            resetQuiz
+            calculateResults,
+            goToQuestion: setCurrentQuestion,
+            goToNextQuestion: () => setCurrentQuestion(q => q + 1),
+            goToPreviousQuestion: () => setCurrentQuestion(q => q - 1),
+            skipQuestion: (index) => {
+                setSkippedQuestions(prev => [...prev, index]);
+                setCurrentQuestion(q => q + 1);
+            }
         }}>
             {children}
         </QuizContext.Provider>

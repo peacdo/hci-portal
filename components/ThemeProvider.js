@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
 const ThemeContext = createContext({
@@ -6,7 +6,7 @@ const ThemeContext = createContext({
     setDarkMode: () => {}
 });
 
-export function ThemeProvider({ children }) {
+export const ThemeProvider = ({ children }) => {
     const [darkMode, setDarkMode] = useState(false);
 
     useEffect(() => {
@@ -51,7 +51,7 @@ export function ThemeProvider({ children }) {
             </button>
         </ThemeContext.Provider>
     );
-}
+};
 
 export const useTheme = () => useContext(ThemeContext);
 

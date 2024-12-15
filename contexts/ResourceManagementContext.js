@@ -1,4 +1,6 @@
+// contexts/ResourceManagementContext.js
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useResources } from './ResourceContext';
 
 const ResourceManagementContext = createContext({});
 
@@ -7,40 +9,47 @@ export function ResourceManagementProvider({ children }) {
     const [notes, setNotes] = useState({});
     const [ratings, setRatings] = useState({});
     const [tags, setTags] = useState({});
+    const { resources } = useResources();
 
-    // Load saved data on mount
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const savedBookmarks = localStorage.getItem('resourceBookmarks');
-            const savedNotes = localStorage.getItem('resourceNotes');
-            const savedRatings = localStorage.getItem('resourceRatings');
-            const savedTags = localStorage.getItem('resourceTags');
+        const loadData = () => {
+            const savedData = {
+                bookmarks: localStorage.getItem('resourceBookmarks'),
+                notes: localStorage.getItem('resourceNotes'),
+                ratings: localStorage.getItem('resourceRatings'),
+                tags: localStorage.getItem('resourceTags')
+            };
 
-            if (savedBookmarks) setBookmarks(JSON.parse(savedBookmarks));
-            if (savedNotes) setNotes(JSON.parse(savedNotes));
-            if (savedRatings) setRatings(JSON.parse(savedRatings));
-            if (savedTags) setTags(JSON.parse(savedTags));
-        }
+            if (savedData.bookmarks) setBookmarks(JSON.parse(savedData.bookmarks));
+            if (savedData.notes) setNotes(JSON.parse(savedData.notes));
+            if (savedData.ratings) setRatings(JSON.parse(savedData.ratings));
+            if (savedData.tags) setTags(JSON.parse(savedData.tags));
+        };
+
+        loadData();
     }, []);
 
-    // Save data when it changes
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('resourceBookmarks', JSON.stringify(bookmarks));
-            localStorage.setItem('resourceNotes', JSON.stringify(notes));
-            localStorage.setItem('resourceRatings', JSON.stringify(ratings));
-            localStorage.setItem('resourceTags', JSON.stringify(tags));
-        }
+        localStorage.setItem('resourceBookmarks', JSON.stringify(bookmarks));
+        localStorage.setItem('resourceNotes', JSON.stringify(notes));
+        localStorage.setItem('resourceRatings', JSON.stringify(ratings));
+        localStorage.setItem('resourceTags', JSON.stringify(tags));
     }, [bookmarks, notes, ratings, tags]);
 
-    const toggleBookmark = (weekId, materialId) => {
-        const resourceKey = `${weekId}-${materialId}`;
-        setBookmarks(prev => {
-            if (prev.includes(resourceKey)) {
-                return prev.filter(b => b !== resourceKey);
-            }
-            return [...prev, resourceKey];
-        });
+    const getBookmarkedResources = () => {
+        return bookmarks.map(bookmark => {
+            const [weekId, materialId] = bookmark.split('-');
+            const week = resources.find(w => w.week.toString() === weekId);
+            if (!week) return null;
+            const material = week.materials[parseInt(materialId)];
+            if (!material) return null;
+            return {
+                ...material,
+                weekId,
+                materialId,
+                weekTitle: week.title
+            };
+        }).filter(Boolean);
     };
 
     const addNote = (weekId, materialId, note) => {
@@ -63,6 +72,16 @@ export function ResourceManagementProvider({ children }) {
         }));
     };
 
+    const toggleBookmark = (weekId, materialId) => {
+        const resourceKey = `${weekId}-${materialId}`;
+        setBookmarks(prev => {
+            if (prev.includes(resourceKey)) {
+                return prev.filter(b => b !== resourceKey);
+            }
+            return [...prev, resourceKey];
+        });
+    };
+
     const setRating = (weekId, materialId, rating) => {
         const resourceKey = `${weekId}-${materialId}`;
         setRatings(prev => ({
@@ -71,54 +90,17 @@ export function ResourceManagementProvider({ children }) {
         }));
     };
 
-    const addTag = (weekId, materialId, tag) => {
-        const resourceKey = `${weekId}-${materialId}`;
-        setTags(prev => ({
-            ...prev,
-            [resourceKey]: [...new Set([...(prev[resourceKey] || []), tag])]
-        }));
-    };
-
-    const removeTag = (weekId, materialId, tagToRemove) => {
-        const resourceKey = `${weekId}-${materialId}`;
-        setTags(prev => ({
-            ...prev,
-            [resourceKey]: prev[resourceKey].filter(tag => tag !== tagToRemove)
-        }));
-    };
-
-    const isBookmarked = (weekId, materialId) => {
-        return bookmarks.includes(`${weekId}-${materialId}`);
-    };
-
-    const getNotes = (weekId, materialId) => {
-        const resourceKey = `${weekId}-${materialId}`;
-        return notes[resourceKey] || [];
-    };
-
-    const getRating = (weekId, materialId) => {
-        const resourceKey = `${weekId}-${materialId}`;
-        return ratings[resourceKey] || 0;
-    };
-
-    const getTags = (weekId, materialId) => {
-        const resourceKey = `${weekId}-${materialId}`;
-        return tags[resourceKey] || [];
-    };
-
     return (
         <ResourceManagementContext.Provider value={{
+            bookmarks,
+            getBookmarkedResources,
             toggleBookmark,
             addNote,
             deleteNote,
             setRating,
-            addTag,
-            removeTag,
-            isBookmarked,
-            getNotes,
-            getRating,
-            getTags,
-            bookmarks
+            isBookmarked: (weekId, materialId) => bookmarks.includes(`${weekId}-${materialId}`),
+            getNotes: (weekId, materialId) => notes[`${weekId}-${materialId}`] || [],
+            getRating: (weekId, materialId) => ratings[`${weekId}-${materialId}`] || 0
         }}>
             {children}
         </ResourceManagementContext.Provider>
