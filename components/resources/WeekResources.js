@@ -1,94 +1,95 @@
 // components/resources/WeekResources.js
 import { useState } from 'react';
-import { Filter } from 'lucide-react';
-import ResourceCard from './ResourceCard';
+import { ChevronDown, ChevronUp, FileText, File, Book } from 'lucide-react';
+import ResourceCard from '../resources/ResourceCard';
+import { useProgress } from '../../contexts/ProgressContext';
 
-const WeekResources = ({ week, viewMode, searchTerm }) => {
-    const [activeFilter, setActiveFilter] = useState('all');
-    const [showRequired, setShowRequired] = useState(false);
+const WeekResources = ({ week, searchTerm, showKeywords, completionFilter, selectedKeywords }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { getWeekProgress, getProgress } = useProgress();
 
     if (!week) return null;
 
-    const filteredMaterials = week.materials.filter(material => {
-        const matchesSearch = searchTerm
-            ? material.title.toLowerCase().includes(searchTerm.toLowerCase())
-            : true;
+    const progress = getWeekProgress(week.week);
 
-        const matchesType = activeFilter === 'all'
-            ? true
-            : material.type.toLowerCase() === activeFilter.toLowerCase();
+    // Filter materials based on search, completion status, and keywords
+    const filteredMaterials = week.materials.filter((material, index) => {
+        // Search filter
+        if (searchTerm && !material.title.toLowerCase().includes(searchTerm.toLowerCase())) {
+            return false;
+        }
 
-        const matchesRequired = !showRequired || material.required;
+        // Completion filter
+        const isCompleted = getProgress(week.week, index);
+        if (completionFilter === 'completed' && !isCompleted) return false;
+        if (completionFilter === 'incomplete' && isCompleted) return false;
 
-        return matchesSearch && matchesType && matchesRequired;
+        // Keywords filter
+        if (selectedKeywords && selectedKeywords.length > 0 &&
+            !selectedKeywords.some(keyword => week.keywords?.includes(keyword))) {
+            return false;
+        }
+
+        return true;
     });
 
+    // Don't show weeks with no matching materials
+    if (filteredMaterials.length === 0 && searchTerm) return null;
+
+    const completedResources = week.materials.filter((_, index) =>
+        getProgress(week.week, index)).length;
+
     return (
-        <div>
-            {/* Filters */}
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-2">
-                    <button
-                        className={`px-4 py-2 rounded-lg transition-colors ${
-                            activeFilter === 'all'
-                                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                        }`}
-                        onClick={() => setActiveFilter('all')}
-                    >
-                        All Types
-                    </button>
-                    <button
-                        className={`px-4 py-2 rounded-lg transition-colors ${
-                            activeFilter === 'pdf'
-                                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                        }`}
-                        onClick={() => setActiveFilter('pdf')}
-                    >
-                        PDFs
-                    </button>
-                    <button
-                        className={`px-4 py-2 rounded-lg transition-colors ${
-                            activeFilter === 'docx'
-                                ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
-                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-                        }`}
-                        onClick={() => setActiveFilter('docx')}
-                    >
-                        Documents
-                    </button>
+        <div className="bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-2xl overflow-hidden transition-all duration-200">
+            {/* Week Header */}
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full p-6 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
+            >
+                <div className="flex items-center space-x-4">
+                    <div className="p-3 bg-blue-600/20 rounded-xl border border-blue-500/20">
+                        <Book className="h-6 w-6 text-blue-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-semibold text-white">
+                            Week {week.week}: {week.title}
+                        </h3>
+                        <p className="text-sm text-gray-400">
+                            {week.materials.length} resources • {completedResources} completed
+                        </p>
+                    </div>
                 </div>
+                <div className="flex items-center space-x-4">
+                    {/* Progress bar */}
+                    <div className="hidden sm:block w-48">
+                        <div className="h-2 bg-gray-700/50 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-blue-500 rounded-full transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                    </div>
+                    {isExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-gray-400" />
+                    ) : (
+                        <ChevronDown className="h-5 w-5 text-gray-400" />
+                    )}
+                </div>
+            </button>
 
-                <label className="flex items-center space-x-2 text-sm">
-                    <input
-                        type="checkbox"
-                        checked={showRequired}
-                        onChange={(e) => setShowRequired(e.target.checked)}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <span>Required Only</span>
-                </label>
-            </div>
-
-            {/* Resource Grid/List */}
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 gap-6' : 'space-y-4'}>
-                {filteredMaterials.map((material, index) => (
-                    <ResourceCard
-                        key={material.path}
-                        material={material}
-                        weekId={week.week}
-                        materialId={index}
-                        viewMode={viewMode}
-                    />
-                ))}
-            </div>
-
-            {filteredMaterials.length === 0 && (
-                <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
-                    <p className="text-gray-500 dark:text-gray-400">
-                        No resources found matching your criteria.
-                    </p>
+            {/* Materials List */}
+            {isExpanded && (
+                <div className="border-t border-gray-700/50">
+                    <div className="p-4 space-y-4">
+                        {filteredMaterials.map((material, index) => (
+                            <ResourceCard
+                                key={index}
+                                material={material}
+                                weekId={week.week}
+                                materialId={index}
+                            />
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
