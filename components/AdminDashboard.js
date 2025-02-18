@@ -1,79 +1,92 @@
 // components/AdminDashboard.js
-import { useState } from 'react';
-import { Upload, Users, Settings, BookOpen } from 'lucide-react';
-import AdminResourceManager from './admin/AdminResourceManager';
+import React, { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/Tabs';
+import UserManagement from './admin/UserManagement';
+import UserApproval from './admin/UserApproval';
+import SectionManagement from './admin/SectionManagement';
+import QuizManagement from './admin/QuizManagement';
+import ResourceManagement from './admin/ResourceManagement';
 import WeekManager from './admin/WeekManager';
-import UserManagement from './UserManagement';
+import { Users, UserPlus, Settings, BookOpen, GraduationCap, FileText, Calendar } from 'lucide-react';
 
 const AdminDashboard = () => {
-    const [activeTab, setActiveTab] = useState('resources');
-
-    const tabs = [
-        {
-            id: 'resources',
-            label: 'Resources',
-            icon: Upload
-        },
-        {
-            id: 'weeks',
-            label: 'Weeks',
-            icon: BookOpen
-        },
-        {
-            id: 'users',
-            label: 'Users',
-            icon: Users
-        },
-        {
-            id: 'settings',
-            label: 'Settings',
-            icon: Settings
-        }
-    ];
+    const [activeTab, setActiveTab] = useState('users');
+    const [selectedSectionId, setSelectedSectionId] = useState(null);
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                    Admin Dashboard
-                </h1>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                    Manage your course resources and users
-                </p>
-            </div>
+        <div className="container mx-auto px-4 py-8">
+            <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
 
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-8">
-                <nav className="-mb-px flex space-x-8">
-                    {tabs.map(tab => {
-                        const Icon = tab.icon;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === tab.id
-                                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Icon className="h-5 w-5 mr-2" />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </nav>
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="mb-8">
+                    <TabsTrigger value="users" className="flex items-center space-x-2">
+                        <Users className="h-4 w-4" />
+                        <span>Users</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="approvals" className="flex items-center space-x-2">
+                        <UserPlus className="h-4 w-4" />
+                        <span>Approvals</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="sections" className="flex items-center space-x-2">
+                        <BookOpen className="h-4 w-4" />
+                        <span>Sections</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="quizzes" className="flex items-center space-x-2">
+                        <GraduationCap className="h-4 w-4" />
+                        <span>Quizzes</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="weeks" className="flex items-center space-x-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>Weeks</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="resources" className="flex items-center space-x-2">
+                        <FileText className="h-4 w-4" />
+                        <span>Resources</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="settings" className="flex items-center space-x-2">
+                        <Settings className="h-4 w-4" />
+                        <span>Settings</span>
+                    </TabsTrigger>
+                </TabsList>
 
-            {activeTab === 'resources' && <AdminResourceManager />}
-            {activeTab === 'weeks' && <WeekManager />}
-            {activeTab === 'users' && <UserManagement />}
-            {activeTab === 'settings' && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-                    <p className="text-gray-500 dark:text-gray-400">
-                        Settings panel coming soon...
-                    </p>
-                </div>
-            )}
+                <TabsContent value="users">
+                    <UserManagement />
+                </TabsContent>
+
+                <TabsContent value="approvals">
+                    <UserApproval />
+                </TabsContent>
+
+                <TabsContent value="sections">
+                    <SectionManagement onSectionSelect={setSelectedSectionId} />
+                </TabsContent>
+
+                <TabsContent value="quizzes">
+                    {selectedSectionId ? (
+                        <QuizManagement sectionId={selectedSectionId} />
+                    ) : (
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                            <h2 className="text-xl font-semibold mb-4">Quiz Management</h2>
+                            <p className="text-gray-500">Please select a section from the Sections tab to manage its quizzes.</p>
+                        </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="weeks">
+                    <WeekManager />
+                </TabsContent>
+
+                <TabsContent value="resources">
+                    <ResourceManagement />
+                </TabsContent>
+
+                <TabsContent value="settings">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h2 className="text-xl font-semibold mb-4">System Settings</h2>
+                        <p className="text-gray-500">System settings coming soon...</p>
+                    </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 };

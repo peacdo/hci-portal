@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isTeacherOrAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin']);
+    }
+    
+    function isAssistantOrAbove() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['assistant', 'teacher', 'admin']);
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isOwner(userId) || isTeacherOrAdmin();
+    }
+    
+    // Sections collection
+    match /sections/{sectionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isTeacherOrAdmin();
+      
+      // Section quizzes
+      match /quizzes/{quizId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isTeacherOrAdmin();
+        
+        // Quiz questions
+        match /questions/{questionId} {
+          allow read: if isAuthenticated();
+          allow write: if isTeacherOrAdmin();
+        }
+      }
+
+      // Section resources
+      match /resources/{resourceId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isTeacherOrAdmin();
+      }
+
+      // Section weeks
+      match /weeks/{weekId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isTeacherOrAdmin();
+      }
+    }
+    
+    // Quiz attempts
+    match /quizAttempts/{attemptId} {
+      allow read: if isAuthenticated() && 
+        (isTeacherOrAdmin() || request.auth.uid == resource.data.studentId);
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && request.auth.uid == resource.data.studentId;
+    }
+    
+    // Resource management
+    match /resources/{resourceId} {
+      allow read: if isAuthenticated();
+      allow write: if isTeacherOrAdmin();
+    }
+    
+    // Resource analytics and tracking
+    match /resourceLogs/{logId} {
+      allow read: if isAssistantOrAbove();
+      allow write: if isAuthenticated();
+    }
+    
+    match /resourceUsage/{usageId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.studentId) || isAssistantOrAbove());
+      allow write: if isAuthenticated();
+    }
+    
+    // Student progress tracking
+    match /timeSpent/{timeId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.studentId) || isAssistantOrAbove());
+      allow write: if isAuthenticated();
+    }
+    
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && isOwner(resource.data.userId);
+      allow write: if isTeacherOrAdmin() || (isAuthenticated() && isOwner(resource.data.userId));
+    }
+
+    // Enrollments collection
+    match /enrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && 
+        (isTeacherOrAdmin() || request.auth.uid == resource.data.studentId);
+      allow create: if isAuthenticated();
+      allow update, delete: if isTeacherOrAdmin();
+    }
+
+    // User progress
+    match /userProgress/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isTeacherOrAdmin());
+      allow write: if isAuthenticated() && (isOwner(userId) || isTeacherOrAdmin());
+    }
+  }
+} 

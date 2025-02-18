@@ -1,5 +1,5 @@
 // contexts/AuthContext.js
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
@@ -14,8 +14,51 @@ import { useAuthState } from '../hooks/useAuthState';
 
 const AuthContext = createContext({});
 
+// Define roles and their hierarchy
+export const ROLES = {
+    ADMIN: 'admin',
+    TEACHER: 'teacher',
+    ASSISTANT: 'assistant',
+    STUDENT: 'student'
+};
+
+// Define role permissions
+const ROLE_PERMISSIONS = {
+    [ROLES.ADMIN]: ['manage_users', 'manage_courses', 'manage_content', 'view_analytics', 'manage_roles'],
+    [ROLES.TEACHER]: ['manage_courses', 'manage_content', 'view_analytics', 'grade_submissions'],
+    [ROLES.ASSISTANT]: ['view_courses', 'grade_submissions', 'manage_content'],
+    [ROLES.STUDENT]: ['view_courses', 'submit_assignments', 'take_quizzes']
+};
+
 export function AuthProvider({ children }) {
-    const { user, loading, error: authStateError } = useAuthState();
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            try {
+                if (user) {
+                    // Get the user document from Firestore
+                    const userDoc = await getDoc(doc(db, 'users', user.uid));
+                    if (userDoc.exists()) {
+                        setUser({ ...user, ...userDoc.data() });
+                    } else {
+                        setUser(user);
+                    }
+                } else {
+                    setUser(null);
+                }
+            } catch (err) {
+                console.error('Error fetching user data:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        return unsubscribe;
+    }, []);
 
     const register = async (email, password, username) => {
         try {
@@ -27,18 +70,18 @@ export function AuthProvider({ children }) {
             // Create user in Firebase Auth
             const result = await createUserWithEmailAndPassword(auth, email, password);
 
-            // Create user document in Firestore
+            // Create user document in Firestore with pending status
             await setDoc(doc(db, 'users', result.user.uid), {
                 username,
                 email,
-                isAdmin: false,
-                role: 'user',
-                status: 'active',
+                role: ROLES.STUDENT, // Default role is student
+                status: 'pending', // New users need approval
                 createdAt: serverTimestamp(),
                 lastLogin: serverTimestamp(),
                 metadata: {
                     registrationMethod: 'email',
-                    registrationComplete: true
+                    registrationComplete: true,
+                    approvalStatus: 'pending'
                 }
             });
 
@@ -64,20 +107,43 @@ export function AuthProvider({ children }) {
             const result = await signInWithEmailAndPassword(auth, email, password);
 
             // Get user data
-            const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-            const userData = userDoc.data();
+            const userRef = doc(db, 'users', result.user.uid);
+            const userDoc = await getDoc(userRef);
 
-            // Check if user is allowed to access
-            if (userData?.status === 'banned') {
-                await signOut(auth);
-                throw new Error('Your account has been suspended. Please contact support.');
+            if (!userDoc.exists()) {
+                // Create user document if it doesn't exist
+                await setDoc(userRef, {
+                    email: result.user.email,
+                    username: result.user.email.split('@')[0],
+                    role: ROLES.STUDENT, // Changed from 'teacher' to ROLES.STUDENT
+                    status: 'pending', // Changed from 'active' to 'pending'
+                    createdAt: serverTimestamp(),
+                    lastLogin: serverTimestamp(),
+                    metadata: {
+                        registrationMethod: 'email',
+                        registrationComplete: true,
+                        approvalStatus: 'pending'
+                    }
+                });
+            } else {
+                const userData = userDoc.data();
+                // Check if user is allowed to access
+                if (userData?.status === 'banned') {
+                    await signOut(auth);
+                    throw new Error('Your account has been suspended. Please contact support.');
+                }
+
+                // Update last login time
+                try {
+                    await updateDoc(userRef, {
+                        lastLogin: serverTimestamp(),
+                        lastLoginMethod: 'email'
+                    });
+                } catch (updateError) {
+                    console.error('Error updating last login:', updateError);
+                    // Continue with login even if update fails
+                }
             }
-
-            // Update last login time
-            await updateDoc(doc(db, 'users', result.user.uid), {
-                lastLogin: serverTimestamp(),
-                lastLoginMethod: 'email'
-            });
 
             return result;
         } catch (error) {
@@ -163,10 +229,23 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const hasPermission = (permission) => {
+        if (!user || !user.role) return false;
+        return ROLE_PERMISSIONS[user.role]?.includes(permission) || false;
+    };
+
+    const isTeacherOrAbove = () => {
+        return user?.role === ROLES.TEACHER || user?.role === ROLES.ADMIN;
+    };
+
+    const isAssistantOrAbove = () => {
+        return user?.role === ROLES.ASSISTANT || isTeacherOrAbove();
+    };
+
     const value = {
         user,
         loading,
-        error: authStateError,
+        error,
         register,
         login,
         logout,
@@ -174,14 +253,18 @@ export function AuthProvider({ children }) {
         updateUserEmail,
         updateUserPassword,
         updateUserProfile,
-        isAdmin: user?.isAdmin || false,
+        hasPermission,
+        isTeacherOrAbove,
+        isAssistantOrAbove,
+        isAdmin: user?.role === ROLES.ADMIN,
         isAuthenticated: !!user,
-        isEmailVerified: user?.emailVerified || false
+        isEmailVerified: user?.emailVerified || false,
+        ROLES
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {!loading && children}
+            {children}
         </AuthContext.Provider>
     );
 }

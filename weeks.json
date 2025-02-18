@@ -1,0 +1,18 @@
+[
+  {
+    "id": "1",
+    "weekNumber": 1,
+    "title": "Introduction to Human-Computer Interaction",
+    "description": "Overview of HCI principles and fundamentals",
+    "createdAt": "2024-02-17T00:00:00.000Z",
+    "updatedAt": "2024-02-17T00:00:00.000Z"
+  },
+  {
+    "id": "2",
+    "weekNumber": 2,
+    "title": "User Research and Analysis",
+    "description": "Understanding user needs and research methodologies",
+    "createdAt": "2024-02-17T00:00:00.000Z",
+    "updatedAt": "2024-02-17T00:00:00.000Z"
+  }
+] 

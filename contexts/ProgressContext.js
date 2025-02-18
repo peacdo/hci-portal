@@ -84,51 +84,104 @@ export function ProgressProvider({ children }) {
     };
 
     const getWeekProgress = (weekId) => {
-        const week = resources.find(w => w.week.toString() === weekId.toString());
-        if (!week) return 0;
+        if (!weekId || !resources || !Array.isArray(resources)) return 0;
 
-        const totalMaterials = week.materials.length;
-        if (totalMaterials === 0) return 0;
+        // Safely extract all resources that have a weekId matching our target
+        const weekResources = resources.reduce((acc, category) => {
+            // Skip if category is undefined or doesn't have resources array
+            if (!category || !Array.isArray(category.resources)) {
+                return acc;
+            }
 
-        const completedMaterials = week.materials.reduce((count, _, index) => {
-            return count + (progress[`${weekId}-${index}`] ? 1 : 0);
+            // Filter resources that belong to this week and have an id
+            const weeklyResources = category.resources.filter(resource => 
+                resource && 
+                resource.weekId && 
+                resource.id &&
+                resource.weekId.toString() === weekId.toString()
+            );
+
+            return [...acc, ...weeklyResources];
+        }, []);
+
+        if (weekResources.length === 0) return 0;
+
+        const totalResources = weekResources.length;
+        const completedResources = weekResources.reduce((count, resource) => {
+            return count + (progress[`${weekId}-${resource.id}`] ? 1 : 0);
         }, 0);
 
-        return (completedMaterials / totalMaterials) * 100;
+        return Math.round((completedResources / totalResources) * 100);
     };
 
     const getTotalProgress = () => {
-        const totalMaterials = resources.reduce((sum, week) => sum + week.materials.length, 0);
-        if (totalMaterials === 0) return 0;
+        if (!resources || !Array.isArray(resources)) return 0;
 
-        const completedMaterials = resources.reduce((sum, week) => {
-            return sum + week.materials.reduce((count, _, index) => {
-                return count + (progress[`${week.week}-${index}`] ? 1 : 0);
-            }, 0);
+        const allResources = resources.reduce((acc, category) => {
+            if (!category || !Array.isArray(category.resources)) {
+                return acc;
+            }
+            
+            // Only include resources that have both weekId and id
+            const validResources = category.resources.filter(resource => 
+                resource && resource.weekId && resource.id
+            );
+            
+            return [...acc, ...validResources];
+        }, []);
+
+        if (allResources.length === 0) return 0;
+
+        const completedResources = allResources.reduce((count, resource) => {
+            return count + (progress[`${resource.weekId}-${resource.id}`] ? 1 : 0);
         }, 0);
 
-        return (completedMaterials / totalMaterials) * 100;
+        return Math.round((completedResources / allResources.length) * 100);
     };
 
     const getProgressStats = () => {
+        if (!resources || !Array.isArray(resources)) {
+            return {
+                totalResources: 0,
+                completedResources: 0,
+                resourcesPerWeek: {},
+                completedPerWeek: {}
+            };
+        }
+
+        const allResources = resources.reduce((acc, category) => {
+            if (!category || !Array.isArray(category.resources)) {
+                return acc;
+            }
+            
+            // Only include resources that have both weekId and id
+            const validResources = category.resources.filter(resource => 
+                resource && resource.weekId && resource.id
+            );
+            
+            return [...acc, ...validResources];
+        }, []);
+
         let stats = {
-            totalMaterials: 0,
-            completedMaterials: 0,
-            materialsPerWeek: {},
+            totalResources: allResources.length,
+            completedResources: 0,
+            resourcesPerWeek: {},
             completedPerWeek: {}
         };
 
-        resources.forEach(week => {
-            const weekId = week.week.toString();
-            stats.totalMaterials += week.materials.length;
-            stats.materialsPerWeek[weekId] = week.materials.length;
+        allResources.forEach(resource => {
+            if (!resource || !resource.weekId || !resource.id) return;
 
-            const completed = week.materials.reduce((count, _, index) => {
-                return count + (progress[`${weekId}-${index}`] ? 1 : 0);
-            }, 0);
-
-            stats.completedMaterials += completed;
-            stats.completedPerWeek[weekId] = completed;
+            const weekId = resource.weekId.toString();
+            
+            // Count total resources per week
+            stats.resourcesPerWeek[weekId] = (stats.resourcesPerWeek[weekId] || 0) + 1;
+            
+            // Count completed resources
+            if (progress[`${weekId}-${resource.id}`]) {
+                stats.completedResources++;
+                stats.completedPerWeek[weekId] = (stats.completedPerWeek[weekId] || 0) + 1;
+            }
         });
 
         return stats;

@@ -1,6 +1,6 @@
 // contexts/ResourceContext.js
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { getResourcesData } from '../lib/githubUtils';
+import { getResources } from '../lib/githubResourceService';
 
 const ResourceContext = createContext({});
 
@@ -8,6 +8,7 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function ResourceProvider({ children }) {
     const [resources, setResources] = useState([]);
+    const [topicResources, setTopicResources] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastFetch, setLastFetch] = useState(null);
@@ -21,16 +22,56 @@ export function ResourceProvider({ children }) {
         try {
             setLoading(true);
             setError(null);
-            const data = await getResourcesData();
+            const data = await getResources();
 
-            // Sort weeks numerically
-            const sortedData = data.sort((a, b) => {
-                if (a.week === 'misc') return 1;
-                if (b.week === 'misc') return -1;
-                return parseInt(a.week) - parseInt(b.week);
+            // Organize resources by week
+            const weekMap = new Map();
+            data.forEach(resource => {
+                // Only process resources that have a valid weekId
+                if (resource.weekId) {
+                    const weekId = resource.weekId.toString();
+                    if (!weekMap.has(weekId)) {
+                        weekMap.set(weekId, {
+                            week: parseInt(weekId),
+                            title: `Week ${weekId}`,
+                            materials: [],
+                            keywords: []
+                        });
+                    }
+                    weekMap.get(weekId).materials.push(resource);
+                    
+                    // Collect unique keywords from resource topics
+                    resource.topics?.forEach(topic => {
+                        if (!weekMap.get(weekId).keywords.includes(topic)) {
+                            weekMap.get(weekId).keywords.push(topic);
+                        }
+                    });
+                }
             });
 
-            setResources(sortedData);
+            // Convert to array and sort by week number
+            const weekResources = Array.from(weekMap.values())
+                .sort((a, b) => a.week - b.week);
+
+            // Group resources by topic category
+            const groupedByTopic = data.reduce((acc, resource) => {
+                resource.topics?.forEach(topic => {
+                    const [category] = topic.split('/');
+                    if (!acc[category]) {
+                        acc[category] = {
+                            category,
+                            resources: []
+                        };
+                    }
+                    if (!acc[category].resources.includes(resource)) {
+                        acc[category].resources.push(resource);
+                    }
+                });
+                return acc;
+            }, {});
+
+            setResources(weekResources);
+            setTopicResources(Object.values(groupedByTopic));
             setLastFetch(Date.now());
         } catch (err) {
             setError('Failed to load resources');
@@ -56,6 +97,7 @@ export function ResourceProvider({ children }) {
 
     const value = {
         resources,
+        topicResources,
         loading,
         error,
         reload: () => fetchResources(true)

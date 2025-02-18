@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useResources } from '../../contexts/ResourceContext';
 import {
     Plus, Save, X, Trash2, Edit2, GripVertical,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import ResourceEditorModal from './ResourceEditorModal';
 import { updateResourcesJson } from '../../lib/githubUtils';
+import Alert from '../ui/Alert';
 
 const WeekManager = () => {
     const { resources, reload } = useResources();
@@ -17,29 +18,182 @@ const WeekManager = () => {
     });
     const [showNewWeekForm, setShowNewWeekForm] = useState(false);
     const [draggedWeek, setDraggedWeek] = useState(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOverWeekId, setDragOverWeekId] = useState(null);
     const [draggedResource, setDraggedResource] = useState(null);
     const [draggedWeekIndex, setDraggedWeekIndex] = useState(null);
     const [editingResource, setEditingResource] = useState(null);
     const [editingWeekId, setEditingWeekId] = useState(null);
+    const [weeks, setWeeks] = useState([]);
+    const [error, setError] = useState(null);
+    const [success, setSuccess] = useState(null);
 
-    const handleNewWeek = async (e) => {
-        e.preventDefault();
+    useEffect(() => {
+        loadWeeks();
+    }, []);
+
+    const loadWeeks = async () => {
         try {
-            const nextWeekNumber = Math.max(...resources.map(w => w.week), 0) + 1;
-            const newWeek = {
-                week: nextWeekNumber,
-                title: newWeekData.title,
-                keywords: newWeekData.keywords.filter(k => k.trim()),
-                materials: []
-            };
+            const response = await fetch('/api/weeks');
+            if (!response.ok) throw new Error('Failed to load weeks');
+            const data = await response.json();
+            // Sort weeks by weekNumber
+            const sortedWeeks = data.sort((a, b) => a.weekNumber - b.weekNumber);
+            setWeeks(sortedWeeks);
+        } catch (err) {
+            setError('Failed to load weeks');
+            console.error(err);
+        }
+    };
 
-            const updatedResources = [...resources, newWeek].sort((a, b) => a.week - b.week);
-            await updateResourcesJson(updatedResources);
-            await reload();
-            setShowNewWeekForm(false);
+    const handleDragStart = (e, week) => {
+        setIsDragging(true);
+        setDraggedWeek(week);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e, targetWeek) => {
+        e.preventDefault();
+        if (!draggedWeek || draggedWeek.id === targetWeek.id) return;
+        setDragOverWeekId(targetWeek.id);
+        e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDragLeave = (e, weekId) => {
+        e.preventDefault();
+        if (dragOverWeekId === weekId) {
+            setDragOverWeekId(null);
+        }
+    };
+
+    const handleDrop = async (e, targetWeek) => {
+        e.preventDefault();
+        setIsDragging(false);
+        setDragOverWeekId(null);
+        if (!draggedWeek || draggedWeek.id === targetWeek.id) return;
+
+        try {
+            const updatedWeeks = [...weeks];
+            const draggedIndex = weeks.findIndex(w => w.id === draggedWeek.id);
+            const targetIndex = weeks.findIndex(w => w.id === targetWeek.id);
+
+            // Reorder the weeks array
+            updatedWeeks.splice(draggedIndex, 1);
+            updatedWeeks.splice(targetIndex, 0, draggedWeek);
+
+            // Update week numbers
+            const reorderedWeeks = updatedWeeks.map((week, index) => ({
+                ...week,
+                weekNumber: index + 1
+            }));
+
+            setWeeks(reorderedWeeks); // Update UI immediately
+
+            // Update all weeks with new order
+            await Promise.all(reorderedWeeks.map(week => 
+                fetch(`/api/weeks?id=${week.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(week)
+                })
+            ));
+
+            setSuccess('Week order updated successfully');
+        } catch (err) {
+            console.error('Failed to reorder weeks:', err);
+            setError('Failed to update week order');
+            loadWeeks(); // Reload original order on error
+        } finally {
+            setDraggedWeek(null);
+        }
+    };
+
+    const handleDragEnd = () => {
+        setIsDragging(false);
+        setDraggedWeek(null);
+        setDragOverWeekId(null);
+    };
+
+    const handleAddWeek = async () => {
+        if (!newWeekData.title.trim()) {
+            setError('Week title is required');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/weeks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...newWeekData,
+                    weekNumber: weeks.length + 1
+                })
+            });
+
+            if (!response.ok) throw new Error('Failed to create week');
+
+            const createdWeek = await response.json();
+            setWeeks([...weeks, createdWeek]);
             setNewWeekData({ title: '', keywords: [] });
-        } catch (error) {
-            console.error('Failed to create new week:', error);
+            setSuccess('Week created successfully');
+        } catch (err) {
+            setError('Failed to create week');
+            console.error(err);
+        }
+    };
+
+    const handleUpdateWeek = async (weekId) => {
+        if (!editingWeek.title.trim()) {
+            setError('Week title is required');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/weeks?id=${weekId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editingWeek)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to update week');
+            }
+
+            const updatedWeek = await response.json();
+            const updatedWeeks = weeks.map(week => 
+                week.id === weekId ? updatedWeek : week
+            );
+            setWeeks(updatedWeeks);
+            setEditingWeek(null);
+            setSuccess('Week updated successfully');
+        } catch (err) {
+            setError(err.message || 'Failed to update week');
+            console.error('Update week error:', err);
+        }
+    };
+
+    const handleDeleteWeek = async (weekId) => {
+        if (!confirm('Are you sure you want to delete this week?')) return;
+
+        try {
+            const response = await fetch(`/api/weeks?id=${weekId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.error || 'Failed to delete week');
+            }
+
+            setWeeks(prevWeeks => prevWeeks.filter(week => week.id !== weekId));
+            setSuccess('Week deleted successfully');
+
+            // Refresh the weeks list to ensure everything is in sync
+            loadWeeks();
+        } catch (err) {
+            console.error('Delete week error:', err);
+            setError(err.message || 'Failed to delete week');
         }
     };
 
@@ -133,6 +287,28 @@ const WeekManager = () => {
 
     return (
         <div className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">Week Manager</h2>
+            </div>
+
+            {error && (
+                <Alert 
+                    type="error" 
+                    message={error} 
+                    onDismiss={() => setError(null)} 
+                    className="mb-4" 
+                />
+            )}
+
+            {success && (
+                <Alert 
+                    type="success" 
+                    message={success} 
+                    onDismiss={() => setSuccess(null)} 
+                    className="mb-4" 
+                />
+            )}
+
             {/* Add New Week Button */}
             <div className="flex justify-end">
                 <button
@@ -147,7 +323,7 @@ const WeekManager = () => {
             {/* New Week Form */}
             {showNewWeekForm && (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                    <form onSubmit={handleNewWeek} className="space-y-4">
+                    <form onSubmit={handleAddWeek} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium mb-1">Week Title</label>
                             <input
@@ -195,159 +371,101 @@ const WeekManager = () => {
 
             {/* Weeks List */}
             <div className="space-y-4">
-                {resources.map((week, weekIndex) => (
+                {weeks.map((week) => (
                     <div
-                        key={week.week}
+                        key={week.id}
                         draggable
-                        onDragStart={() => setDraggedWeekIndex(weekIndex)}
-                        onDragOver={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                        }}
-                        onDrop={(e) => {
-                            e.preventDefault();
-                            handleWeekDrop(weekIndex);
-                        }}
-                        className="bg-white dark:bg-gray-800 rounded-lg shadow"
+                        onDragStart={(e) => handleDragStart(e, week)}
+                        onDragOver={(e) => handleDragOver(e, week)}
+                        onDragLeave={(e) => handleDragLeave(e, week.id)}
+                        onDrop={(e) => handleDrop(e, week)}
+                        onDragEnd={handleDragEnd}
+                        className={`group p-4 border dark:border-gray-700 rounded-lg transition-all duration-200 ${
+                            draggedWeek?.id === week.id 
+                                ? 'opacity-50 bg-gray-50 dark:bg-gray-800/50'
+                                : dragOverWeekId === week.id
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                                : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                        } ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                     >
-                        <div className="p-4 cursor-move">
-                            {editingWeek === week.week ? (
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        handleEditWeek(week.week, editingWeekData);
-                                    }}
-                                    className="space-y-3"
-                                >
+                        {editingWeek?.id === week.id ? (
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Title</label>
                                     <input
                                         type="text"
-                                        value={editingWeekData?.title || ''}
-                                        onChange={(e) => setEditingWeekData(prev => ({
-                                            ...prev,
-                                            title: e.target.value
-                                        }))}
-                                        className="w-full p-2 border rounded-lg"
+                                        value={editingWeek.title}
+                                        onChange={(e) => setEditingWeek({ 
+                                            ...editingWeek, 
+                                            title: e.target.value 
+                                        })}
+                                        className="w-full px-3 py-2 border dark:border-gray-700 rounded-lg dark:bg-gray-700"
+                                        placeholder={`Week ${week.weekNumber}`}
                                     />
-                                    <input
-                                        type="text"
-                                        value={editingWeekData?.keywords?.join(', ') || ''}
-                                        onChange={(e) => setEditingWeekData(prev => ({
-                                            ...prev,
-                                            keywords: e.target.value.split(',').map(k => k.trim())
-                                        }))}
-                                        className="w-full p-2 border rounded-lg"
-                                        placeholder="Keywords (comma-separated)"
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Description</label>
+                                    <textarea
+                                        value={editingWeek.description}
+                                        onChange={(e) => setEditingWeek({ 
+                                            ...editingWeek, 
+                                            description: e.target.value 
+                                        })}
+                                        className="w-full px-3 py-2 border dark:border-gray-700 rounded-lg dark:bg-gray-700"
+                                        rows={3}
                                     />
-                                    <div className="flex justify-end space-x-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setEditingWeek(null);
-                                                setEditingWeekData(null);
-                                            }}
-                                            className="px-3 py-1 text-gray-600 hover:text-gray-900"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                                        >
-                                            Save
-                                        </button>
-                                    </div>
-                                </form>
-                            ) : (
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                        <GripVertical className="h-5 w-5 text-gray-400 mr-2" />
-                                        <h3 className="text-lg font-semibold">
-                                            Week {week.week}: {week.title}
-                                        </h3>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <button
-                                            onClick={() => setEditingWeek(week.week)}
-                                            className="p-1 text-gray-500 hover:text-gray-700"
-                                        >
-                                            <Edit2 className="h-5 w-5" />
-                                        </button>
-                                        <button
-                                            onClick={() => setExpandedWeeks(prev =>
-                                                prev.includes(week.week)
-                                                    ? prev.filter(w => w !== week.week)
-                                                    : [...prev, week.week]
-                                            )}
-                                            className="p-1 text-gray-500 hover:text-gray-700"
-                                        >
-                                            {expandedWeeks.includes(week.week) ? (
-                                                <ChevronUp className="h-5 w-5" />
-                                            ) : (
-                                                <ChevronDown className="h-5 w-5" />
-                                            )}
-                                        </button>
-                                    </div>
                                 </div>
-                            )}
-
-                            {/* Keywords */}
-                            {!editingWeek && week.keywords?.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {week.keywords.map((keyword, idx) => (
-                                        <span
-                                            key={idx}
-                                            className="px-2 py-1 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full"
-                                        >
-                                            {keyword}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Resources List */}
-                        {expandedWeeks.includes(week.week) && (
-                            <div className="border-t dark:border-gray-700 p-4 space-y-2">
-                                {week.materials.map((material, materialIndex) => (
-                                    <div
-                                        key={material.path}
-                                        draggable
-                                        onDragStart={() => setDraggedResource(material)}
-                                        onDragOver={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                        }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            handleResourceDrop(weekIndex, materialIndex);
-                                        }}
-                                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-move"
+                                <div className="flex space-x-2">
+                                    <button
+                                        onClick={() => handleUpdateWeek(week.id)}
+                                        className="flex items-center px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700"
                                     >
-                                        <div className="flex items-center">
-                                            <GripVertical className="h-4 w-4 text-gray-400 mr-2" />
-                                            <FileText className={`h-4 w-4 ${
-                                                material.type === 'pdf'
-                                                    ? 'text-red-500'
-                                                    : 'text-blue-500'
-                                            } mr-2`} />
-                                            <span>{material.title}</span>
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                setEditingResource(material);
-                                                setEditingWeekId(week.week);
-                                            }}
-                                            className="p-1 text-gray-500 hover:text-gray-700"
-                                        >
-                                            <Edit3 className="h-4 w-4" />
-                                        </button>
+                                        <Save className="h-4 w-4 mr-1" />
+                                        Save
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingWeek(null)}
+                                        className="flex items-center px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                                    >
+                                        <X className="h-4 w-4 mr-1" />
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-4">
+                                    <div 
+                                        className="flex items-center justify-center w-8 h-8 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Drag to reorder"
+                                    >
+                                        <GripVertical className="h-5 w-5" />
                                     </div>
-                                ))}
-                                {week.materials.length === 0 && (
-                                    <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-                                        No resources in this week
-                                    </p>
-                                )}
+                                    <div>
+                                        <h3 className="text-lg font-medium">
+                                            Week {week.weekNumber}: {week.title || `Week ${week.weekNumber}`}
+                                        </h3>
+                                        <p className="text-gray-500 dark:text-gray-400 mt-1">
+                                            {week.description}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex space-x-2">
+                                    <button
+                                        onClick={() => setEditingWeek(week)}
+                                        className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                        title="Edit week"
+                                    >
+                                        <Edit2 className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteWeek(week.id)}
+                                        className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                        title="Delete week"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

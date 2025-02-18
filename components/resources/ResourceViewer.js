@@ -4,8 +4,7 @@ import {
     X, Download, Loader, FileText,
     AlertTriangle, Eye, RefreshCw
 } from 'lucide-react';
-import Alert from './Alert';
-import { getGithubDownloadUrl } from '../../lib/githubUtils';
+import Alert from '../ui/Alert';
 
 const ResourceViewer = ({ resource, onClose }) => {
     const [isLoading, setIsLoading] = useState(true);
@@ -13,15 +12,19 @@ const ResourceViewer = ({ resource, onClose }) => {
     const [loadAttempts, setLoadAttempts] = useState(0);
     const [previewUrl, setPreviewUrl] = useState(null);
 
-    const getPreviewUrl = useCallback(async () => {
+    const getPreviewUrl = useCallback(() => {
         try {
-            const url = await getGithubDownloadUrl(resource.viewLink);
+            const url = resource.url;
+            if (!url) {
+                throw new Error('Resource URL not available');
+            }
+
             // For PDF files, we can use PDF.js or browser's native viewer
-            if (resource.type === 'pdf') {
+            if (resource.type === 'PDF') {
                 setPreviewUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`);
             } else {
-                // For DOCX, we'll use Office Online viewer
-                setPreviewUrl(`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`);
+                // For other files, use the direct URL
+                setPreviewUrl(url);
             }
             setError(null);
         } catch (err) {
@@ -34,10 +37,12 @@ const ResourceViewer = ({ resource, onClose }) => {
         getPreviewUrl();
     }, [getPreviewUrl]);
 
-    const handleDownload = async () => {
+    const handleDownload = () => {
         try {
-            const downloadUrl = await getGithubDownloadUrl(resource.downloadLink);
-            window.open(downloadUrl, '_blank');
+            if (!resource.downloadUrl) {
+                throw new Error('Download URL not available');
+            }
+            window.open(resource.downloadUrl, '_blank');
             onClose();
         } catch (err) {
             setError('Failed to start download');
@@ -64,19 +69,12 @@ const ResourceViewer = ({ resource, onClose }) => {
     }, [isLoading]);
 
     return (
-        <div
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-            onClick={(e) => e.target === e.currentTarget && onClose()}
-        >
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
                     <div className="flex items-center">
-                        {resource.type === 'pdf' ? (
-                            <FileText className="h-5 w-5 text-red-500 mr-2" />
-                        ) : (
-                            <FileText className="h-5 w-5 text-blue-500 mr-2" />
-                        )}
+                        <FileText className="h-5 w-5 text-gray-500 mr-2" />
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                             {resource.title}
                         </h3>
@@ -101,9 +99,7 @@ const ResourceViewer = ({ resource, onClose }) => {
                     {error ? (
                         <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
                             <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
-                            <Alert variant="destructive" className="mb-6">
-                                {error}
-                            </Alert>
+                            <Alert type="error" message={error} className="mb-6" />
                             <div className="flex space-x-4">
                                 {loadAttempts < 3 && (
                                     <button
@@ -123,7 +119,7 @@ const ResourceViewer = ({ resource, onClose }) => {
                                 </button>
                             </div>
                         </div>
-                    ) : previewUrl && (
+                    ) : (
                         <iframe
                             src={previewUrl}
                             className="w-full h-full border-0"
@@ -149,7 +145,7 @@ const ResourceViewer = ({ resource, onClose }) => {
                                 Open in New Tab
                             </button>
                             <span className="text-sm text-gray-500 dark:text-gray-400">
-                                {resource.type.toUpperCase()}
+                                {resource.type}
                             </span>
                         </div>
                         <button

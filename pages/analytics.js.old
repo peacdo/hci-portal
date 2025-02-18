@@ -1,0 +1,1196 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/router';
+import Layout from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
+import {
+    BarChart2,
+    TrendingUp,
+    Users,
+    Clock,
+    Book,
+    GraduationCap,
+    Award,
+    Download,
+    Eye,
+    Filter,
+    RefreshCw,
+    BookOpen,
+    Loader,
+    AlertTriangle,
+    Calendar,
+    FileText,
+    Bell,
+    CheckCircle,
+    Activity
+} from 'lucide-react';
+import {
+    LineChart,
+    BarChart,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    Line,
+    Bar,
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell
+} from 'recharts';
+import {
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent
+} from '@radix-ui/react-tabs';
+import { getSections, getSection, getEnrolledStudentsCount } from '../lib/sectionService';
+import { getQuizAttempts, getSectionQuizzes } from '../lib/quizService';
+import { getModuleResources, getResourceRatings } from '../lib/resourceService';
+import { getPredictedPerformance, getResourceUsagePatterns } from '../lib/predictiveService';
+import { createNotification, getUserNotifications, NOTIFICATION_TYPES } from '../lib/notificationService';
+import {
+    Tabs as RadixTabs,
+    TabsList as RadixTabsList,
+    TabsTrigger as RadixTabsTrigger,
+    TabsContent as RadixTabsContent
+} from '@radix-ui/react-tabs';
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+
+const StatCard = ({ title, value, icon: Icon, trend, description }) => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Icon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="text-lg font-semibold">{title}</h3>
+            </div>
+            {trend && (
+                <div className={`flex items-center ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <TrendingUp className={`h-4 w-4 mr-1 ${trend < 0 ? 'transform rotate-180' : ''}`} />
+                    <span>{Math.abs(trend)}%</span>
+                </div>
+            )}
+        </div>
+        <div className="text-3xl font-bold mb-2">{value}</div>
+        {description && (
+            <p className="text-sm text-gray-500 dark:text-gray-400">{description}</p>
+        )}
+    </div>
+);
+
+const PredictiveAnalytics = ({ studentId }) => {
+    const [predictions, setPredictions] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPredictions = async () => {
+            try {
+                const data = await getPredictedPerformance(studentId);
+                setPredictions(data);
+            } catch (error) {
+                console.error('Error fetching predictions:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (studentId) {
+            fetchPredictions();
+        }
+    }, [studentId]);
+
+    if (loading) return <div>Loading predictions...</div>;
+    if (!predictions) return null;
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatCard
+                    title="Engagement Score"
+                    value={`${Math.round(predictions.engagementScore)}%`}
+                    icon={Activity}
+                    trend={predictions.performanceTrend > 0 ? 'up' : 'down'}
+                    description="Based on quiz attempts, resource usage, and time spent"
+                />
+                <StatCard
+                    title="Risk Level"
+                    value={predictions.riskLevel.toUpperCase()}
+                    icon={AlertTriangle}
+                    className={`${
+                        predictions.riskLevel === 'high'
+                            ? 'text-red-600'
+                            : predictions.riskLevel === 'medium'
+                            ? 'text-yellow-600'
+                            : 'text-green-600'
+                    }`}
+                    description="Student's risk level based on engagement and performance"
+                />
+                <StatCard
+                    title="Performance Trend"
+                    value={`${Math.round(predictions.performanceTrend)}%`}
+                    icon={TrendingUp}
+                    trend={predictions.performanceTrend > 0 ? 'up' : 'down'}
+                    description="Change in performance over recent assessments"
+                />
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Course Predictions</h3>
+                <div className="space-y-4">
+                    {predictions.coursePredictions.map(prediction => (
+                        <div
+                            key={prediction.courseId}
+                            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                        >
+                            <div>
+                                <div className="font-medium">{prediction.courseId}</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    Current Score: {Math.round(prediction.currentScore)}%
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="font-medium">
+                                    Predicted: {Math.round(prediction.predictedScore)}%
+                                </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    Confidence: {Math.round(prediction.confidence)}%
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const NotificationPanel = ({ notifications, onClose }) => (
+    <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50">
+        <div className="p-4 border-b dark:border-gray-700">
+            <h3 className="text-lg font-semibold">Notifications</h3>
+        </div>
+        <div className="max-h-96 overflow-y-auto">
+            {notifications.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                    No new notifications
+                </div>
+            ) : (
+                <div className="divide-y dark:divide-gray-700">
+                    {notifications.map(notification => (
+                        <div key={notification.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <div className="flex items-start">
+                                <div className="flex-shrink-0">
+                                    {notification.type === NOTIFICATION_TYPES.QUIZ_DEADLINE ? (
+                                        <Clock className="h-5 w-5 text-yellow-500" />
+                                    ) : notification.type === NOTIFICATION_TYPES.QUIZ_GRADED ? (
+                                        <CheckCircle className="h-5 w-5 text-green-500" />
+                                    ) : (
+                                        <AlertTriangle className="h-5 w-5 text-blue-500" />
+                                    )}
+                                </div>
+                                <div className="ml-3">
+                                    <p className="text-sm font-medium">{notification.title}</p>
+                                    <p className="text-sm text-gray-500 mt-1">{notification.message}</p>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        {new Date(notification.createdAt?.toDate()).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    </div>
+);
+
+const ResourceAnalytics = ({ courseId }) => {
+    const [patterns, setPatterns] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [resourceDetails, setResourceDetails] = useState(null);
+    const [selectedTimeRange, setSelectedTimeRange] = useState('week');
+
+    useEffect(() => {
+        const fetchPatterns = async () => {
+            try {
+                const data = await getResourceUsagePatterns(courseId);
+                setPatterns(data);
+            } catch (error) {
+                console.error('Error fetching resource patterns:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (courseId) {
+            fetchPatterns();
+        }
+    }, [courseId]);
+
+    useEffect(() => {
+        const fetchResourceDetails = async () => {
+            try {
+                const resources = await getModuleResources(courseId);
+                const ratingsPromises = resources.map(resource => 
+                    getResourceRatings(courseId, resource.moduleId, resource.id)
+                );
+                const ratings = await Promise.all(ratingsPromises);
+                
+                const details = resources.map((resource, index) => ({
+                    ...resource,
+                    ratings: ratings[index],
+                    averageRating: ratings[index].reduce((sum, r) => sum + r.value, 0) / ratings[index].length || 0,
+                    totalViews: resource.views || 0,
+                    uniqueViews: new Set(resource.viewedBy || []).size,
+                    completionRate: (resource.completedBy || []).length / (resource.viewedBy || []).length * 100 || 0
+                }));
+
+                setResourceDetails(details);
+            } catch (error) {
+                console.error('Error fetching resource details:', error);
+            }
+        };
+
+        if (courseId) {
+            fetchResourceDetails();
+        }
+    }, [courseId]);
+
+    if (loading) return <div>Loading resource analytics...</div>;
+    if (!patterns) return null;
+
+    const timeSlotLabels = [
+        '12am-4am',
+        '4am-8am',
+        '8am-12pm',
+        '12pm-4pm',
+        '4pm-8pm',
+        '8pm-12am'
+    ];
+
+    const dayLabels = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday'
+    ];
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Time of Day Usage */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">Usage by Time of Day</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={Object.entries(patterns.timePatterns).map(([slot, count]) => ({
+                            name: timeSlotLabels[slot],
+                            value: count
+                        }))}>
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="#3b82f6" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Day of Week Usage */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold mb-4">Usage by Day of Week</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={Object.entries(patterns.dayPatterns).map(([day, count]) => ({
+                            name: dayLabels[day],
+                            value: count
+                        }))}>
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="#3b82f6" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
+
+            {/* Popular Resources */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Most Popular Resources</h3>
+                <div className="space-y-4">
+                    {Object.entries(patterns.popularityMap)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 5)
+                        .map(([resourceId, count]) => (
+                            <div
+                                key={resourceId}
+                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                            >
+                                <div className="font-medium">{resourceId}</div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    {count} views
+                                </div>
+                            </div>
+                        ))}
+                </div>
+            </div>
+
+            {/* Resource Performance Details */}
+            {resourceDetails && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-semibold">Resource Performance</h3>
+                        <select
+                            value={selectedTimeRange}
+                            onChange={(e) => setSelectedTimeRange(e.target.value)}
+                            className="px-3 py-2 border dark:border-gray-700 rounded-lg"
+                        >
+                            <option value="week">Last 7 Days</option>
+                            <option value="month">Last 30 Days</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead>
+                                <tr className="border-b dark:border-gray-700">
+                                    <th className="px-4 py-3 text-left">Resource</th>
+                                    <th className="px-4 py-3 text-left">Type</th>
+                                    <th className="px-4 py-3 text-right">Views</th>
+                                    <th className="px-4 py-3 text-right">Unique Views</th>
+                                    <th className="px-4 py-3 text-right">Avg. Rating</th>
+                                    <th className="px-4 py-3 text-right">Completion Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {resourceDetails.map(resource => (
+                                    <tr key={resource.id} className="border-b dark:border-gray-700">
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium">{resource.title}</div>
+                                            <div className="text-sm text-gray-500">{resource.moduleId}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500">{resource.type}</td>
+                                        <td className="px-4 py-3 text-right">{resource.totalViews}</td>
+                                        <td className="px-4 py-3 text-right">{resource.uniqueViews}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            {resource.averageRating.toFixed(1)} ⭐
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            {resource.completionRate.toFixed(1)}%
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const getStudentPerformanceMetrics = async (studentId) => {
+    const [timeSpent, resourceUsage, attempts] = await Promise.all([
+        getStudentTimeSpent(studentId),
+        getResourceUsage(studentId),
+        getStudentAttempts(studentId)
+    ]);
+
+    const engagementScore = calculateEngagementScore(attempts, resourceUsage, timeSpent);
+    const performanceTrend = calculatePerformanceTrend(attempts);
+    const coursePredictions = generateCoursePredictions(attempts, resourceUsage, timeSpent);
+    const riskLevel = calculateRiskLevel(engagementScore, performanceTrend);
+
+    return {
+        engagementScore,
+        performanceTrend,
+        coursePredictions,
+        riskLevel,
+        timeSpent,
+        resourceUsage,
+        attempts
+    };
+};
+
+const getResourceEffectiveness = async (courseId) => {
+    const patterns = await getResourceUsagePatterns(courseId);
+    return {
+        popularTimes: patterns.popularTimes,
+        topResources: patterns.topResources,
+        accessPatterns: patterns.accessPatterns,
+        completionRates: patterns.completionRates
+    };
+};
+
+const AnalyticsDashboard = () => {
+    const router = useRouter();
+    const { user } = useAuth();
+    const [timeRange, setTimeRange] = useState('week');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [sections, setSections] = useState([]);
+    const [selectedSection, setSelectedSection] = useState(null);
+    const [quizData, setQuizData] = useState([]);
+    const [studentCount, setStudentCount] = useState(0);
+    const [resourceData, setResourceData] = useState(null);
+    const [stats, setStats] = useState({
+        courses: [],
+        quizAttempts: [],
+        resources: [],
+        totalStudents: 0,
+        activeStudents: 0,
+        completionRate: 0,
+        averageQuizScore: 0
+    });
+    const [trends, setTrends] = useState([]);
+    const [topCourses, setTopCourses] = useState([]);
+    const [quizPerformance, setQuizPerformance] = useState([]);
+    const [autoRefresh, setAutoRefresh] = useState(false);
+    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [studentList, setStudentList] = useState([]);
+    const [lastUpdate, setLastUpdate] = useState(new Date());
+    const refreshInterval = useRef(null);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [notificationCount, setNotificationCount] = useState(0);
+    const [selectedTimeRange, setSelectedTimeRange] = useState('7d');
+
+    useEffect(() => {
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+        fetchAnalytics();
+    }, [user, timeRange]);
+
+    useEffect(() => {
+        return () => {
+            if (refreshInterval.current) {
+                clearInterval(refreshInterval.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        let interval;
+        if (autoRefresh) {
+            interval = setInterval(fetchAnalytics, 30000); // Refresh every 30 seconds
+        }
+        return () => clearInterval(interval);
+    }, [autoRefresh]);
+
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            try {
+                const fetchedNotifications = await getUserNotifications(user.uid, {
+                    limit: 10,
+                    status: 'unread'
+                });
+                setNotifications(fetchedNotifications);
+                setNotificationCount(fetchedNotifications.length);
+            } catch (error) {
+                console.error('Error fetching notifications:', error);
+            }
+        };
+
+        if (user) {
+            fetchNotifications();
+        }
+    }, [user]);
+
+    useEffect(() => {
+        // Check for important analytics events and create notifications
+        const checkAnalyticsEvents = async () => {
+            if (!stats.courses || !stats.quizAttempts) return;
+
+            // Check for low performing students
+            const lowPerformingStudents = studentList.filter(student => 
+                student.averageScore < 60 && student.attempts > 2
+            );
+
+            if (lowPerformingStudents.length > 0) {
+                await createNotification(user.uid, {
+                    type: NOTIFICATION_TYPES.STUDENT_PERFORMANCE,
+                    title: 'Low Performance Alert',
+                    message: `${lowPerformingStudents.length} students are performing below 60%`
+                });
+            }
+
+            // Check for high course engagement
+            const highEngagementCourses = stats.courses.filter(course =>
+                (course.enrolledCount / course.maxStudents) > 0.9
+            );
+
+            if (highEngagementCourses.length > 0) {
+                await createNotification(user.uid, {
+                    type: NOTIFICATION_TYPES.COURSE_ENGAGEMENT,
+                    title: 'High Course Engagement',
+                    message: `${highEngagementCourses.length} courses are near capacity`
+                });
+            }
+        };
+
+        if (autoRefresh) {
+            checkAnalyticsEvents();
+        }
+    }, [stats, autoRefresh, studentList, user]);
+
+    const fetchAnalytics = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            
+            // Fetch sections instead of courses
+            const fetchedSections = await getSections();
+            setSections(fetchedSections);
+
+            if (fetchedSections.length > 0) {
+                const firstSection = fetchedSections[0];
+                setSelectedSection(firstSection);
+
+                // Fetch section-specific data
+                const [
+                    quizzes,
+                    enrolledCount,
+                    resourcePatterns
+                ] = await Promise.all([
+                    getSectionQuizzes(firstSection.id),
+                    getEnrolledStudentsCount(firstSection.id),
+                    getResourceUsagePatterns(firstSection.id)
+                ]);
+
+                setQuizData(quizzes);
+                setStudentCount(enrolledCount);
+                setResourceData(resourcePatterns);
+            }
+        } catch (error) {
+            console.error('Error fetching analytics:', error);
+            setError('Failed to load analytics data');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSectionChange = async (sectionId) => {
+        try {
+            const section = sections.find(s => s.id === sectionId);
+            setSelectedSection(section);
+
+            const [
+                quizzes,
+                enrolledCount,
+                resourcePatterns
+            ] = await Promise.all([
+                getSectionQuizzes(sectionId),
+                getEnrolledStudentsCount(sectionId),
+                getResourceUsagePatterns(sectionId)
+            ]);
+
+            setQuizData(quizzes);
+            setStudentCount(enrolledCount);
+            setResourceData(resourcePatterns);
+        } catch (error) {
+            console.error('Error changing section:', error);
+            setError('Failed to load section data');
+        }
+    };
+
+    const generateTrendData = () => {
+        const days = timeRange === 'week' ? 7 : 30;
+        const data = [];
+        const now = new Date();
+
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+            const dayAttempts = stats.quizAttempts.filter(attempt => {
+                const attemptDate = new Date(attempt.submittedAt.toDate());
+                return attemptDate.toDateString() === date.toDateString();
+            });
+
+            data.push({
+                date: date.toLocaleDateString(),
+                attempts: dayAttempts.length,
+                averageScore: dayAttempts.length > 0
+                    ? dayAttempts.reduce((sum, a) => sum + a.score, 0) / dayAttempts.length
+                    : 0
+            });
+        }
+
+        return data;
+    };
+
+    const generateQuizPerformanceData = (attempts) => {
+        // Create performance ranges
+        const ranges = {
+            '0-20%': { min: 0, max: 20, count: 0 },
+            '21-40%': { min: 21, max: 40, count: 0 },
+            '41-60%': { min: 41, max: 60, count: 0 },
+            '61-80%': { min: 61, max: 80, count: 0 },
+            '81-100%': { min: 81, max: 100, count: 0 }
+        };
+
+        // Count attempts in each range
+        attempts.forEach(attempt => {
+            const score = attempt.score;
+            for (const [range, { min, max }] of Object.entries(ranges)) {
+                if (score >= min && score <= max) {
+                    ranges[range].count++;
+                    break;
+                }
+            }
+        });
+
+        // Convert to array format for chart
+        return Object.entries(ranges).map(([range, data]) => ({
+            range,
+            attempts: data.count
+        }));
+    };
+
+    const downloadReport = (data, type) => {
+        const now = new Date().toISOString().split('T')[0];
+        let csvContent = '';
+        
+        switch (type) {
+            case 'courses':
+                csvContent = 'Course Title,Enrolled Students,Completion Rate,Status\n' +
+                    data.courses.map(course => 
+                        `"${course.title}",${course.enrolledCount || 0},${course.completionRate || 0},${course.status}`
+                    ).join('\n');
+                break;
+            case 'quizzes':
+                csvContent = 'Date,Attempts,Average Score\n' +
+                    data.trends.map(trend => 
+                        `${trend.date},${trend.attempts},${trend.averageScore}`
+                    ).join('\n');
+                break;
+            default:
+                return;
+        }
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `analytics_${type}_${now}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const fetchStudentList = useCallback(async () => {
+        try {
+            // Get unique student IDs from quiz attempts
+            const uniqueStudents = new Set(stats.quizAttempts.map(attempt => attempt.studentId));
+            const studentData = Array.from(uniqueStudents).map(studentId => {
+                const attempts = stats.quizAttempts.filter(a => a.studentId === studentId);
+                const averageScore = attempts.reduce((sum, a) => sum + a.score, 0) / attempts.length;
+                const lastAttempt = new Date(Math.max(...attempts.map(a => a.submittedAt.toDate())));
+                
+                return {
+                    id: studentId,
+                    attempts: attempts.length,
+                    averageScore,
+                    lastAttempt,
+                    progress: Math.random() * 100 // Replace with actual progress data
+                };
+            });
+
+            setStudentList(studentData);
+        } catch (err) {
+            console.error('Error fetching student list:', err);
+        }
+    }, [stats.quizAttempts]);
+
+    useEffect(() => {
+        if (stats.quizAttempts.length > 0) {
+            fetchStudentList();
+        }
+    }, [stats.quizAttempts, fetchStudentList]);
+
+    const getStudentPerformance = (studentId) => {
+        const attempts = stats.quizAttempts.filter(a => a.studentId === studentId);
+        return {
+            totalAttempts: attempts.length,
+            averageScore: attempts.reduce((sum, a) => sum + a.score, 0) / attempts.length,
+            courseProgress: stats.courses.map(course => ({
+                courseId: course.id,
+                title: course.title,
+                progress: Math.random() * 100 // Replace with actual progress data
+            }))
+        };
+    };
+
+    if (loading) {
+        return (
+            <Layout>
+                <div className="flex items-center justify-center p-6">
+                    <Loader className="h-8 w-8 animate-spin text-primary-600" />
+                </div>
+            </Layout>
+        );
+    }
+
+    if (error) {
+        return (
+            <Layout>
+                <div className="p-4 bg-red-50 text-red-600 rounded-lg flex items-center">
+                    <AlertTriangle className="h-5 w-5 mr-2" />
+                    {error}
+                </div>
+            </Layout>
+        );
+    }
+
+    return (
+        <Layout>
+            <div className="container mx-auto px-4 py-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-2xl font-bold">Analytics Dashboard</h1>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowNotifications(!showNotifications)}
+                            className="relative p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                            <Bell className="h-6 w-6" />
+                            {notificationCount > 0 && (
+                                <span className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                    {notificationCount}
+                                </span>
+                            )}
+                        </button>
+                        {showNotifications && (
+                            <NotificationPanel
+                                notifications={notifications}
+                                onClose={() => setShowNotifications(false)}
+                            />
+                        )}
+                    </div>
+                    
+                    {/* Section selector */}
+                    <select
+                        value={selectedSection?.id || ''}
+                        onChange={(e) => handleSectionChange(e.target.value)}
+                        className="px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                    >
+                        {sections.map(section => (
+                            <option key={section.id} value={section.id}>
+                                {section.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="mb-8">
+                    <h1 className="text-2xl font-bold mb-2">Analytics Dashboard</h1>
+                    <p className="text-gray-600 dark:text-gray-400">
+                        Track student performance, resource usage, and course engagement
+                    </p>
+                </div>
+
+                <div className="flex justify-between items-center mb-8">
+                    <div className="flex items-center space-x-4">
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={() => downloadReport({ courses: stats.courses }, 'courses')}
+                                className="p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                title="Download Course Report"
+                            >
+                                <Download className="h-5 w-5" />
+                            </button>
+                            <button
+                                onClick={() => downloadReport({ trends: generateTrendData() }, 'quizzes')}
+                                className="p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                title="Download Quiz Report"
+                            >
+                                <BarChart2 className="h-5 w-5" />
+                            </button>
+                            <button
+                                onClick={() => setAutoRefresh(!autoRefresh)}
+                                className={`p-2 rounded-lg ${
+                                    autoRefresh 
+                                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                                        : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'
+                                }`}
+                                title={autoRefresh ? 'Disable auto-refresh' : 'Enable auto-refresh'}
+                            >
+                                <RefreshCw className={`h-5 w-5 ${autoRefresh ? 'animate-spin' : ''}`} />
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                        {autoRefresh && (
+                            <span className="text-sm text-gray-500">
+                                Last updated: {lastUpdate.toLocaleTimeString()}
+                            </span>
+                        )}
+                        <select
+                            value={selectedTimeRange}
+                            onChange={(e) => setSelectedTimeRange(e.target.value)}
+                            className="px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                        >
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
+                            <option value="90d">Last 90 Days</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="mb-8">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h2 className="text-lg font-semibold mb-4">Student Performance</h2>
+                        <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
+                            <select
+                                value={selectedStudent || ''}
+                                onChange={(e) => setSelectedStudent(e.target.value)}
+                                className="px-4 py-2 border dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800"
+                            >
+                                <option value="">All Students</option>
+                                {studentList.map(student => (
+                                    <option key={student.id} value={student.id}>
+                                        {student.id} ({student.averageScore.toFixed(1)}% avg)
+                                    </option>
+                                ))}
+                            </select>
+                            {selectedStudent && (
+                                <div className="flex space-x-4">
+                                    <div className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">Attempts: </span>
+                                        <span className="font-medium">
+                                            {studentList.find(s => s.id === selectedStudent)?.attempts || 0}
+                                        </span>
+                                    </div>
+                                    <div className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">Last Activity: </span>
+                                        <span className="font-medium">
+                                            {studentList.find(s => s.id === selectedStudent)?.lastAttempt.toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        {selectedStudent && (
+                            <div className="mt-6">
+                                <h3 className="text-md font-medium mb-4">Course Progress</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {getStudentPerformance(selectedStudent).courseProgress.map(course => (
+                                        <div key={course.courseId} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                            <h4 className="font-medium mb-2">{course.title}</h4>
+                                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2.5">
+                                                <div
+                                                    className="bg-blue-600 h-2.5 rounded-full"
+                                                    style={{ width: `${course.progress}%` }}
+                                                />
+                                            </div>
+                                            <div className="text-sm text-gray-500 mt-2">
+                                                {course.progress.toFixed(1)}% complete
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <StatCard
+                        title="Total Students"
+                        value={stats.totalStudents}
+                        icon={Users}
+                        trend={12}
+                        description="Enrolled across all courses"
+                    />
+                    <StatCard
+                        title="Active Students"
+                        value={stats.activeStudents}
+                        icon={GraduationCap}
+                        trend={8}
+                        description="Engaged in the last 30 days"
+                    />
+                    <StatCard
+                        title="Course Completion"
+                        value={`${stats.completionRate.toFixed(1)}%`}
+                        icon={Award}
+                        trend={5}
+                        description="Average completion rate"
+                    />
+                    <StatCard
+                        title="Quiz Performance"
+                        value={`${stats.averageQuizScore.toFixed(1)}%`}
+                        icon={BookOpen}
+                        trend={-3}
+                        description="Average quiz score"
+                    />
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+                    <h2 className="text-xl font-semibold mb-6">Activity Trends</h2>
+                    <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={generateTrendData()}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="date" />
+                                <YAxis yAxisId="left" />
+                                <YAxis yAxisId="right" orientation="right" />
+                                <Tooltip />
+                                <Line
+                                    yAxisId="left"
+                                    type="monotone"
+                                    dataKey="attempts"
+                                    stroke="#3b82f6"
+                                    name="Quiz Attempts"
+                                />
+                                <Line
+                                    yAxisId="right"
+                                    type="monotone"
+                                    dataKey="averageScore"
+                                    stroke="#10b981"
+                                    name="Average Score"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h2 className="text-xl font-semibold mb-6">Course Enrollment</h2>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={stats.courses.map(course => ({
+                                    name: course.title,
+                                    students: course.enrolledCount || 0
+                                }))}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <Tooltip />
+                                    <Bar dataKey="students" fill="#3b82f6" name="Enrolled Students" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                        <h2 className="text-xl font-semibold mb-6">Course Completion Rates</h2>
+                        <div className="h-80">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={stats.courses.map(course => ({
+                                            name: course.title,
+                                            completion: course.completionRate || 0
+                                        }))}
+                                        dataKey="completion"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={100}
+                                        label
+                                    >
+                                        {stats.courses.map((course, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-semibold">Quiz Performance Distribution</h2>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Total Attempts: {stats.quizAttempts.length}
+                        </div>
+                    </div>
+                    <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={generateQuizPerformanceData(stats.quizAttempts)}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="range" />
+                                <YAxis />
+                                <Tooltip />
+                                <Bar
+                                    dataKey="attempts"
+                                    fill="#8B5CF6"
+                                    name="Number of Attempts"
+                                >
+                                    {generateQuizPerformanceData(stats.quizAttempts).map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg">
+                    <h2 className="text-xl font-semibold mb-6">Top Performing Courses</h2>
+                    <div className="space-y-4">
+                        {topCourses.map((course, index) => (
+                            <div
+                                key={course.id}
+                                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                            >
+                                <div className="flex items-center">
+                                    <span className="text-lg font-semibold mr-4">
+                                        #{index + 1}
+                                    </span>
+                                    <div>
+                                        <h3 className="font-medium">{course.title}</h3>
+                                        <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                            <span>{course.enrolledCount || 0} students</span>
+                                            <span>•</span>
+                                            <span>{course.completionRate || 0}% completion</span>
+                                            <span>•</span>
+                                            <span>{
+                                                stats.quizAttempts
+                                                    .filter(a => a.courseId === course.id)
+                                                    .reduce((avg, a) => avg + a.score, 0) /
+                                                stats.quizAttempts
+                                                    .filter(a => a.courseId === course.id)
+                                                    .length || 0
+                                            }% avg score</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        course.status === 'active' 
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                                            : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                                    }`}>
+                                        {course.status}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <RadixTabs defaultValue="overview" className="space-y-6">
+                    <RadixTabsList>
+                        <RadixTabsTrigger value="overview">Overview</RadixTabsTrigger>
+                        <RadixTabsTrigger value="predictive">Predictive Analytics</RadixTabsTrigger>
+                        <RadixTabsTrigger value="resources">Resource Analytics</RadixTabsTrigger>
+                    </RadixTabsList>
+
+                    <RadixTabsContent value="overview">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                                <h2 className="text-xl font-semibold mb-6">Course Enrollment</h2>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={stats.courses.map(course => ({
+                                            name: course.title,
+                                            students: course.enrolledCount || 0
+                                        }))}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="name" />
+                                            <YAxis />
+                                            <Tooltip />
+                                            <Bar dataKey="students" fill="#3b82f6" name="Enrolled Students" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                                <h2 className="text-xl font-semibold mb-6">Course Completion Rates</h2>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={stats.courses.map(course => ({
+                                                    name: course.title,
+                                                    completion: course.completionRate || 0
+                                                }))}
+                                                dataKey="completion"
+                                                nameKey="name"
+                                                cx="50%"
+                                                cy="50%"
+                                                outerRadius={100}
+                                                label
+                                            >
+                                                {stats.courses.map((course, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    </RadixTabsContent>
+
+                    <RadixTabsContent value="predictive">
+                        <PredictiveAnalytics studentId={selectedStudent} />
+                    </RadixTabsContent>
+
+                    <RadixTabsContent value="resources">
+                        <ResourceAnalytics courseId={selectedSection?.id} />
+                    </RadixTabsContent>
+                </RadixTabs>
+
+                <div className="flex justify-between items-center mt-8">
+                    <div className="flex items-center space-x-4">
+                        <button
+                            onClick={() => downloadReport({ courses: stats.courses }, 'courses')}
+                            className="p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                            title="Download Course Report"
+                        >
+                            <Download className="h-5 w-5" />
+                        </button>
+                        <button
+                            onClick={() => downloadReport({ trends: generateTrendData() }, 'quizzes')}
+                            className="p-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                            title="Download Quiz Report"
+                        >
+                            <BarChart2 className="h-5 w-5" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Student Performance Section */}
+                {selectedStudent && (
+                    <div className="mt-8">
+                        <h2 className="text-xl font-semibold mb-4">Student Performance</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                                <div className="text-sm text-gray-500 mb-1">Engagement Score</div>
+                                <div className="text-2xl font-bold">{getStudentPerformance(selectedStudent).averageScore}%</div>
+                                <div className="mt-2 text-sm">
+                                    Based on activity and participation
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                                <div className="text-sm text-gray-500 mb-1">Risk Level</div>
+                                <div className="text-2xl font-bold">{selectedStudent && getStudentPerformance(selectedStudent).averageScore < 60 ? 'High' : 'Low'}</div>
+                                <div className="mt-2 text-sm">
+                                    Current performance risk assessment
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg">
+                                <div className="text-sm text-gray-500 mb-1">Performance Trend</div>
+                                <div className="text-2xl font-bold">{selectedStudent && getStudentPerformance(selectedStudent).averageScore < 60 ? 'Down' : 'Up'}</div>
+                                <div className="mt-2 text-sm">
+                                    Based on recent quiz attempts
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </Layout>
+    );
+};
+
+export default AnalyticsDashboard; 
